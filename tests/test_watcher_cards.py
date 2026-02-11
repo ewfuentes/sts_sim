@@ -374,7 +374,11 @@ def test_swivel_gives_block_and_free_attack():
     hi = setup_card(cs, sts_sim.Card.Swivel)
     cs.play_card(hi, None)
     assert cs.player.block > 0
-    assert cs.get_player_power(sts_sim.PowerType.FreeAttack) == 1
+    # Next attack should be free — play a 1-cost Strike and verify no energy spent
+    energy_before = cs.player.energy
+    hi2 = setup_card(cs, sts_sim.Card.StrikePurple, energy=energy_before)
+    cs.play_card(hi2, 0)
+    assert cs.player.energy == energy_before  # attack was free
 
 
 def test_indignation_in_wrath_applies_vuln():
@@ -541,7 +545,7 @@ def test_watcher_card_exhausts():
     assert sts_sim.CardInstance(sts_sim.Card.Collect, False).py_exhausts is True
     assert sts_sim.CardInstance(sts_sim.Card.DeusExMachina, False).py_exhausts is True
     assert sts_sim.CardInstance(sts_sim.Card.Blasphemy, False).py_exhausts is True
-    assert sts_sim.CardInstance(sts_sim.Card.Blasphemy, True).py_exhausts is False  # upgraded
+    assert sts_sim.CardInstance(sts_sim.Card.Blasphemy, True).py_exhausts is True  # BG: always exhausts
 
 
 def test_watcher_card_retain():

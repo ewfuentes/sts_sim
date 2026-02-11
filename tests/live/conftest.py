@@ -360,93 +360,10 @@ RELIC_TO_BG = {
 
 
 # ---------------------------------------------------------------------------
-# Common powers to clear between tests. The set command only modifies powers
-# you list, so we must explicitly zero-out any power that a previous test
-# might have applied.
+# Power clearing: SetStateCommand now clears ALL existing powers on a creature
+# before applying the specified map.  We only need to send powers we actually
+# want on the creature (amount > 0).  Empty dict {} means "clear everything".
 # ---------------------------------------------------------------------------
-CLEAR_PLAYER_POWERS = {
-    "Strength": 0,
-    "Dexterity": 0,
-    "Vulnerable": 0,
-    "Weak": 0,
-    "Artifact": 0,
-    "Entangled": 0,
-    "Flex": 0,  # Strength Down from Flex — persists as negative Strength modifier
-    "BGTheDiePower": 0,  # Remove die roll power to prevent block gain on card play
-    "No Draw": 0,  # BattleTrance prevents further draws — clear between tests
-    "Thorns": 0,  # FlameBarrier
-    "Metallicize": 0,  # Metallicize power card
-    "Rage": 0,  # RageCard
-    "BGCombust": 0,  # CombustCard
-    "BGDark Embrace": 0,  # DarkEmbrace
-    "Evolve": 0,  # Evolve
-    "Feel No Pain": 0,  # FeelNoPain
-    "Fire Breathing": 0,  # FireBreathing
-    "Rupture": 0,  # Rupture
-    "Barricade": 0,  # Barricade
-    "BGBerserk": 0,  # BerserkCard
-    "BGCorruptionPower": 0,  # Corruption
-    "Demon Form": 0,  # DemonForm
-    "BGJuggernaut": 0,  # Juggernaut
-    "BGDouble Attack": 0,  # DoubleTap
-    "LoseStrength": 0,  # MutagenicStrength relic
-    "BGConjureBladePower": 0,  # ConjureBlade power
-    # Silent powers
-    "BGAccuracy": 0,
-    "BGAfterImage": 0,
-    "BGFootwork": 0,
-    "BGNoxiousFumes": 0,
-    "BGWellLaidPlans": 0,
-    "BGDistraction": 0,
-    "BGInfinite Blades": 0,
-    "BGAThousandCuts": 0,
-    "BGBurst": 0,
-    "BGEnvenom": 0,
-    "BGToolsOfTheTrade": 0,
-    "BGWraithForm": 0,
-    "Poison": 0,
-    "Choke": 0,
-    "BGCorpseExplosion": 0,
-    # Defect powers
-    "BGCapacitor": 0,
-    "BGConsume": 0,
-    "BGFusion": 0,
-    "BGHeatsinks": 0,
-    "BGLoop": 0,
-    "BGMachineLearning": 0,
-    "BGStorm": 0,
-    "BGBuffer": 0,
-    "BGDefragment": 0,
-    "BGEchoForm": 0,
-    "BGElectrodynamics": 0,
-    "BGStaticDischarge": 0,
-    "BGAmplify": 0,
-    "Focus": 0,
-    # Watcher powers
-    "BGBattleHymn": 0,
-    "BGSimmeringFury": 0,
-    "BGMentalFortress": 0,
-    "BGNirvana": 0,
-    "BGLikeWater": 0,
-    "BGForesight": 0,
-    "BGStudy": 0,
-    "BGRushdown": 0,
-    "BGOmega": 0,
-    "BGDevaForm": 0,
-    "BGDevotion": 0,
-    "BGEstablishment": 0,
-    "BGWreathOfFlame": 0,
-    "Mantra": 0,
-}
-
-# Powers to clear on monsters (e.g. Curl Up on Louse triggers block on hit)
-CLEAR_MONSTER_POWERS = {
-    "BGCurl Up": 0,
-    "Vulnerable": 0,
-    "Weak": 0,
-    "Strength": 0,
-    "Artifact": 0,
-}
 
 
 # ---------------------------------------------------------------------------
@@ -621,8 +538,17 @@ def _dismiss_blocking_screens(client):
         if "play" in cmds or "end" in cmds:
             return  # Combat is ready for card play
         if "choose" in cmds:
-            # Dismiss whatever choice screen is showing (energy pick, card reward, etc.)
-            client.choose(0)
+            if "confirm" in cmds:
+                # Optional choice screen (scry, etc.) — just confirm
+                client.send_command("confirm")
+            else:
+                # Mandatory choice — dismiss with first option
+                client.choose(0)
+            time.sleep(0.5)
+            continue
+        # HAND_SELECT stuck after choose — press confirm key directly
+        if state and state.screen_type and state.screen_type.value == "HAND_SELECT":
+            client.send_command("key confirm")
             time.sleep(0.5)
             continue
         for cmd in ("proceed", "confirm", "skip", "return", "leave"):
@@ -683,18 +609,49 @@ def _wait_for_play_resolution(client, choices=None):
             return state
 
         # Auto-handle choice screens (TargetSelectScreen, card selection, etc.)
+        screen_name = state.screen_type.value if state and state.screen_type else None
         if "choose" in cmds:
             if choice_idx < len(choices):
                 client.choose(choices[choice_idx])
                 choice_idx += 1
-            else:
+                next_timeout = 10.0
+                continue
+            elif screen_name == "HAND_SELECT":
+                # HAND_SELECT with anyNumber: choose(0) to select a card,
+                # then the confirm/key-confirm flow handles finalization.
                 client.choose(0)
-            next_timeout = 10.0  # Sent a command, expect response
+                next_timeout = 10.0
+                continue
+            elif "confirm" in cmds or "proceed" in cmds:
+                # Non-HAND_SELECT optional screen (scry, etc.) — confirm to skip.
+                client.send_command("confirm" if "confirm" in cmds else "proceed")
+                next_timeout = 10.0
+                continue
+            else:
+                # Mandatory choice — pick first option
+                client.choose(0)
+                next_timeout = 10.0
+                continue
+
+        # Confirm/proceed screens (no choose available)
+        if "confirm" in cmds or "proceed" in cmds:
+            client.send_command("confirm" if "confirm" in cmds else "proceed")
+            next_timeout = 10.0
             continue
 
-        # Unrecognized state (confirm, transition, etc.) — try once more
-        # with a short timeout to see if another update follows.
-        next_timeout = 1.5
+        # HAND_SELECT screen stuck after choose — the game selected the
+        # card but the confirm button isn't visible to CommunicationMod.
+        # Sending "key confirm" bypasses the button state check and
+        # presses the confirm key directly.
+        if state and state.screen_type and state.screen_type.value == "HAND_SELECT":
+            client.send_command("key confirm")
+            next_timeout = 10.0
+            continue
+
+        # Unrecognized state — request fresh state in case game finished
+        # processing but didn't proactively send an update.
+        client.request_state()
+        next_timeout = 3.0
 
     return state
 
@@ -708,6 +665,7 @@ def set_scenario(client, *,
                  player_block=0,
                  player_powers=None,
                  player_relics=None,
+                 orbs=None,
                  monster_hp=8,
                  monster_block=0,
                  monster_powers=None,
@@ -737,12 +695,15 @@ def set_scenario(client, *,
         "max_hp": 9,
         "energy": energy,
         "block": player_block,
+        "max_orbs": 3,  # Ensure orb slots exist for Defect cards
         "hand": [_card_spec_to_bg(c) for c in hand],
         "draw_pile": [_card_spec_to_bg(c) for c in draw_pile],
         "discard_pile": [_card_spec_to_bg(c) for c in discard_pile],
         "exhaust_pile": [],
-        "powers": {**CLEAR_PLAYER_POWERS, **(player_powers or {})},
+        "powers": player_powers or {},
     }
+    if orbs is not None:
+        player_section["orbs"] = orbs
 
     # Build monster section
     if monsters is not None:
@@ -753,7 +714,7 @@ def set_scenario(client, *,
                 "current_hp": m.get("hp", 30),
                 "max_hp": m.get("hp", 30),
                 "block": m.get("block", 0),
-                "powers": {**CLEAR_MONSTER_POWERS, **(m.get("powers") or {})},
+                "powers": m.get("powers") or {},
             })
     else:
         monster_section = [{
@@ -761,7 +722,7 @@ def set_scenario(client, *,
             "current_hp": monster_hp,
             "max_hp": monster_hp,
             "block": monster_block,
-            "powers": {**CLEAR_MONSTER_POWERS, **(monster_powers or {})},
+            "powers": monster_powers or {},
         }]
 
     # Build relic list — always include TheDie relic
@@ -795,8 +756,9 @@ def set_scenario(client, *,
 
 def make_sim(*, hand=None, draw_pile=None, discard_pile=None,
              energy=3, player_hp=9, player_block=0,
-             player_powers=None, player_relics=None, monster_hp=8,
-             monster_block=0, monster_powers=None, monsters=None):
+             player_powers=None, player_relics=None, orbs=None,
+             monster_hp=8, monster_block=0, monster_powers=None,
+             monsters=None):
     """Create a simulator CombatState matching the game scenario.
 
     Use ``monsters`` (list of dicts with hp/block/powers keys) to configure
@@ -848,6 +810,13 @@ def make_sim(*, hand=None, draw_pile=None, discard_pile=None,
             pt = getattr(sts_sim.PowerType, power_name)
             sim.apply_player_power(pt, amount)
 
+    # Set up orb slots and channel orbs
+    sim.set_orb_slots(3)  # Always ensure orb slots exist
+    if orbs:
+        for orb_name in orbs:
+            orb_type = getattr(sts_sim.OrbType, orb_name)
+            sim.channel_orb_type(orb_type)
+
     for card_spec in draw_pile:
         card = _card_spec_card(card_spec)
         if _card_spec_upgraded(card_spec):
@@ -869,6 +838,9 @@ def make_sim(*, hand=None, draw_pile=None, discard_pile=None,
         else:
             sim.add_card_to_hand(card)
 
+    # Lock die to 1 to match the live game's set_scenario die=1
+    sim.set_die_value(1)
+
     return sim
 
 
@@ -883,10 +855,8 @@ def play_card_both(client, sim, hand_index, target_index=None, choices=None):
     client.play_card(hand_index, target_index=target_index)
     game_state = _wait_for_play_resolution(client, choices)
 
-    if target_index is not None:
-        sim.play_card(hand_index, target_index)
-    else:
-        sim.play_card(hand_index)
+    sim_choice = choices[0] if choices else None
+    sim.play_card(hand_index, target_index, sim_choice)
 
     return game_state
 
@@ -920,10 +890,9 @@ def play_named_card(client, sim, setup_state, card, target_index=None,
     client.play_card(live_idx, target_index=target_index)
     game_state = _wait_for_play_resolution(client, choices)
 
-    if target_index is not None:
-        sim.play_card(sim_idx, target_index)
-    else:
-        sim.play_card(sim_idx)
+    # Pass first choice to the sim (if any) for cards like WishCard
+    sim_choice = choices[0] if choices else None
+    sim.play_card(sim_idx, target_index, sim_choice)
 
     return game_state
 

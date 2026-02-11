@@ -86,7 +86,7 @@ pub enum PowerType {
     OmegaPower,      // Deal damage at end of turn
     DevotionPower,   // Gain miracles at start of turn
     SimmeringFury,   // Increase Wrath damage bonus
-    FreeAttack,      // Next attack costs 0
+
     NirvanaPower,    // Gain block on scry
     ForesightPower,  // Scry at start of turn
     StudyPower,      // Extra draw per turn

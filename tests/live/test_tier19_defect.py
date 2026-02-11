@@ -91,6 +91,7 @@ def _make_defect_sim(*, hand=None, draw_pile=None, discard_pile=None,
         else:
             sim.add_card_to_hand(card)
 
+    sim.set_die_value(1)
     return sim
 
 
@@ -150,17 +151,16 @@ def test_zap(game):
 def test_dualcast(game):
     """Dualcast evokes the first orb twice. Verify energy and piles.
 
-    Setup: Zap first to have an orb, then Dualcast.
+    Setup: Pre-channel a Lightning orb, then Dualcast.
     """
-    hand = [sts_sim.Card.Zap, sts_sim.Card.Dualcast]
+    hand = [sts_sim.Card.Dualcast]
 
-    setup = set_scenario(game, hand=hand, energy=3, monster_hp=30)
+    setup = set_scenario(game, hand=hand, energy=3, monster_hp=30,
+                         orbs=["Lightning"])
     sim = _make_defect_sim(hand=hand, energy=3, monster_hp=30)
+    sim.channel_orb_type(sts_sim.OrbType.Lightning)
 
-    # Channel an orb first
-    state = play_named_card(game, sim, setup, sts_sim.Card.Zap)
-    # Then evoke it twice
-    state = play_card_both(game, sim, hand_index=0)
+    state = play_named_card(game, sim, setup, sts_sim.Card.Dualcast)
 
     assert_monsters_match(state, sim)
     assert_player_matches(state, sim)
@@ -192,15 +192,17 @@ def test_ball_lightning(game):
 def test_barrage(game):
     """Barrage hits once per channeled orb. With no orbs, deals 0 hits.
 
-    Setup: Zap first to have 1 orb, then Barrage for 1 hit.
+    Setup: Pre-channel 1 Lightning orb, then Barrage for 1 hit.
     """
-    hand = [sts_sim.Card.Zap, sts_sim.Card.Barrage]
+    hand = [sts_sim.Card.Barrage]
 
-    setup = set_scenario(game, hand=hand, energy=3, monster_hp=30)
+    setup = set_scenario(game, hand=hand, energy=3, monster_hp=30,
+                         orbs=["Lightning"])
     sim = _make_defect_sim(hand=hand, energy=3, monster_hp=30)
+    sim.channel_orb_type(sts_sim.OrbType.Lightning)
 
-    state = play_named_card(game, sim, setup, sts_sim.Card.Zap)
-    state = play_card_both(game, sim, hand_index=0, target_index=0)
+    state = play_named_card(game, sim, setup, sts_sim.Card.Barrage,
+                            target_index=0)
 
     assert_monsters_match(state, sim)
     assert_player_matches(state, sim)
@@ -370,15 +372,16 @@ def test_leap(game):
 def test_recursion(game):
     """Recursion evokes first orb and channels a copy.
 
-    Setup: Zap first to have a Lightning orb, then Recursion.
+    Setup: Pre-channel a Lightning orb, then play Recursion.
     """
-    hand = [sts_sim.Card.Zap, sts_sim.Card.Recursion]
+    hand = [sts_sim.Card.Recursion]
 
-    setup = set_scenario(game, hand=hand, energy=3, monster_hp=30)
+    setup = set_scenario(game, hand=hand, energy=3, monster_hp=30,
+                         orbs=["Lightning"])
     sim = _make_defect_sim(hand=hand, energy=3, monster_hp=30)
+    sim.channel_orb_type(sts_sim.OrbType.Lightning)
 
-    state = play_named_card(game, sim, setup, sts_sim.Card.Zap)
-    state = play_card_both(game, sim, hand_index=0)
+    state = play_named_card(game, sim, setup, sts_sim.Card.Recursion)
 
     assert_monsters_match(state, sim)
     assert_player_matches(state, sim)
@@ -750,7 +753,7 @@ def test_reinforced_body(game):
     sim = _make_defect_sim(hand=hand, energy=3, monster_hp=30)
 
     state = play_named_card(game, sim, setup, sts_sim.Card.ReinforcedBody,
-                            choices=[3])
+                            choices=[2])
 
     assert_player_matches(state, sim)
     assert_discard_matches(state, sim)
@@ -1000,16 +1003,18 @@ def test_fission(game):
 def test_multi_cast(game):
     """MultiCast evokes first orb X times.
 
-    Setup: Zap + MultiCast in hand, 3 energy. Zap first to have orb.
-    Then MultiCast with choices=[2] (spend 2 remaining energy).
+    Setup: Pre-channel a Lightning orb, then MultiCast with 3 energy.
+    MultiCast with choices=[2] (spend 2 remaining energy after cost 0).
     """
-    hand = [sts_sim.Card.Zap, sts_sim.Card.MultiCast]
+    hand = [sts_sim.Card.MultiCast]
 
-    setup = set_scenario(game, hand=hand, energy=3, monster_hp=30)
+    setup = set_scenario(game, hand=hand, energy=3, monster_hp=30,
+                         orbs=["Lightning"])
     sim = _make_defect_sim(hand=hand, energy=3, monster_hp=30)
+    sim.channel_orb_type(sts_sim.OrbType.Lightning)
 
-    state = play_named_card(game, sim, setup, sts_sim.Card.Zap)
-    state = play_card_both(game, sim, hand_index=0, choices=[2])
+    state = play_named_card(game, sim, setup, sts_sim.Card.MultiCast,
+                            choices=[2])
 
     assert_monsters_match(state, sim)
     assert_player_matches(state, sim)

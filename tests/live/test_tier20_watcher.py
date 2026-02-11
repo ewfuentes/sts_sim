@@ -98,6 +98,7 @@ def make_watcher_sim(*, hand=None, draw_pile=None, discard_pile=None,
         else:
             sim.add_card_to_hand(card)
 
+    sim.set_die_value(1)
     return sim
 
 
@@ -973,7 +974,7 @@ def test_wish(game):
     setup = set_scenario(game, hand=hand, energy=3, monster_hp=30)
     sim = make_watcher_sim(hand=hand, energy=3, monster_hp=30)
 
-    # Choose block option (choice 0 = Plated Armor / block)
+    # BG mod: choice 0 = Strength, choice 1 = Block, choice 2 = Miracles
     state = play_named_card(game, sim, setup, sts_sim.Card.WishCard,
                             choices=[0])
 

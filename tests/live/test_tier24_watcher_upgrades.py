@@ -92,6 +92,7 @@ def make_watcher_sim(*, hand=None, draw_pile=None, discard_pile=None,
         else:
             sim.add_card_to_hand(card)
 
+    sim.set_die_value(1)
     return sim
 
 

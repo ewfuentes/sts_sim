@@ -80,13 +80,14 @@ def test_zap_upgraded_cost(game):
 def test_dualcast_upgraded_cost(game):
     """Dualcast+ costs 0 (down from 1), evokes orb twice.
 
-    Setup: Dualcast+ in hand, energy=3.
+    Setup: Dualcast+ in hand, energy=3, pre-channel Lightning orb.
     After play: energy=3 (0 cost).
     """
     hand = [(sts_sim.Card.Dualcast, True)]
 
-    setup = set_scenario(game, hand=hand, energy=3, monster_hp=30)
-    sim = make_sim(hand=hand, energy=3, monster_hp=30)
+    setup = set_scenario(game, hand=hand, energy=3, monster_hp=30,
+                         orbs=["Lightning"])
+    sim = make_sim(hand=hand, energy=3, monster_hp=30, orbs=["Lightning"])
 
     state = play_named_card(game, sim, setup, sts_sim.Card.Dualcast,
                             upgraded=True)
@@ -314,13 +315,14 @@ def test_leap_upgraded_block(game):
 def test_recursion_upgraded_cost(game):
     """Recursion+ costs 0 (down from 1), evokes orb, channels copy.
 
-    Setup: Recursion+ in hand, energy=3.
+    Setup: Recursion+ in hand, energy=3, pre-channel Lightning orb.
     After play: energy=3 (0 cost).
     """
     hand = [(sts_sim.Card.Recursion, True)]
 
-    setup = set_scenario(game, hand=hand, energy=3, monster_hp=30)
-    sim = make_sim(hand=hand, energy=3, monster_hp=30)
+    setup = set_scenario(game, hand=hand, energy=3, monster_hp=30,
+                         orbs=["Lightning"])
+    sim = make_sim(hand=hand, energy=3, monster_hp=30, orbs=["Lightning"])
 
     state = play_named_card(game, sim, setup, sts_sim.Card.Recursion,
                             upgraded=True)
@@ -1005,13 +1007,14 @@ def test_fission_upgraded(game):
 def test_multi_cast_upgraded_magic(game):
     """MultiCast+ gains 1 bonus (magic 0->1). Cost X.
 
-    Setup: MultiCast+ in hand, energy=3.
+    Setup: MultiCast+ in hand, energy=3, pre-channel Lightning orb.
     After play with X=3: energy=0.
     """
     hand = [(sts_sim.Card.MultiCast, True)]
 
-    setup = set_scenario(game, hand=hand, energy=3, monster_hp=30)
-    sim = make_sim(hand=hand, energy=3, monster_hp=30)
+    setup = set_scenario(game, hand=hand, energy=3, monster_hp=30,
+                         orbs=["Lightning"])
+    sim = make_sim(hand=hand, energy=3, monster_hp=30, orbs=["Lightning"])
 
     state = play_named_card(game, sim, setup, sts_sim.Card.MultiCast,
                             upgraded=True, choices=[3])

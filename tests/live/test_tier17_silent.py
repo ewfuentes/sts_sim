@@ -940,24 +940,29 @@ def test_storm_of_steel_discard_hand(game):
     assert_discard_matches(state, sim)
 
 
-def test_doppelganger_x_cost_exhaust(game):
-    """Doppelganger is an X-cost skill that exhausts (base). Cost X.
+def test_doppelganger_copies_strike(game):
+    """Doppelganger copies and replays the most recently played card.
 
-    Setup: Doppelganger in hand, 3 energy. Spend all 3 energy.
+    Setup: StrikeGreen + Doppelganger, energy=3, monster_hp=30.
+    Play StrikeGreen first (damage 1, energy=2).
+    Play Doppelganger: auto-selects X=1, copies Strike, deals 1 damage.
+    Assert: monster HP=28, energy=1, Doppelganger exhausted.
     """
-    hand = [sts_sim.Card.Doppelganger]
+    hand = [sts_sim.Card.StrikeGreen, sts_sim.Card.Doppelganger]
 
-    set_scenario(game, hand=hand, energy=3, monster_hp=30)
+    setup = set_scenario(game, hand=hand, energy=3, monster_hp=30)
     sim = make_sim(hand=hand, energy=3, monster_hp=30)
 
-    state = play_card_both(game, sim, hand_index=0, choices=[3])
+    # Play StrikeGreen first
+    state = play_named_card(game, sim, setup, sts_sim.Card.StrikeGreen,
+                            target_index=0)
 
+    # Play Doppelganger (auto-selects X=1, copies Strike)
+    state = play_card_both(game, sim, hand_index=0)
+
+    assert_monsters_match(state, sim)
     assert_player_matches(state, sim)
     assert_exhaust_matches(state, sim)
-
-    assert state.combat_state.player.energy == 0, (
-        f"Expected 0 energy after Doppelganger, got {state.combat_state.player.energy}"
-    )
 
 
 def test_corpse_explosion_poison(game):

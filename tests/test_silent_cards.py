@@ -80,14 +80,13 @@ def test_catalyst_upgraded_triples_poison():
 
 
 def test_corpse_explosion_applies_poison_and_power():
-    """Corpse Explosion applies poison and CorpseExplosion power."""
+    """Corpse Explosion applies poison (BG mod doesn't apply CorpseExplosion power)."""
     cs = make_combat()
     cs.start_combat()
     hi = setup_card(cs, sts_sim.Card.CorpseExplosionCard)
     cs.play_card(hi, 0)
     m = cs.get_monsters()[0]
     assert m.get_power(sts_sim.PowerType.Poison) == 2
-    assert m.get_power(sts_sim.PowerType.CorpseExplosion) == 1
 
 
 def test_bouncing_flask_applies_poison():
@@ -566,17 +565,17 @@ def test_adrenaline_upgraded_gives_2_energy():
 
 
 def test_outmaneuver_gives_energy():
-    """Outmaneuver gives energy equal to magic number."""
+    """Outmaneuver: BG mod only gives energy if retained from last turn (no-op here)."""
     cs = make_combat()
     cs.start_combat()
     hi = setup_card(cs, sts_sim.Card.Outmaneuver, energy=3)
     cs.play_card(hi, None)
-    # Cost 0, magic +2: 3 - 0 + 2 = 5
-    assert cs.player.energy == 5
+    # BG mod: energy gain only when retained; cost 0 so energy unchanged
+    assert cs.player.energy == 3
 
 
 def test_unload_attacks_and_discards():
-    """Unload deals damage and discards cards."""
+    """Unload deals damage (BG mod: no hand discard, uses shiv relic instead)."""
     cs = make_combat()
     cs.start_combat()
     hp_before = cs.get_monsters()[0].hp
@@ -584,8 +583,8 @@ def test_unload_attacks_and_discards():
     hand_before = len(cs.get_hand())
     cs.play_card(hi, 0)
     assert cs.get_monsters()[0].hp < hp_before
-    # Played 1, discarded 1: net -2
-    assert len(cs.get_hand()) == hand_before - 1 - 1
+    # BG mod: only the played card leaves hand (no discard effect)
+    assert len(cs.get_hand()) == hand_before - 1
 
 
 def test_bullet_time_prevents_draw():

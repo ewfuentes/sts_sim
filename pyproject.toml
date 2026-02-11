@@ -10,5 +10,8 @@ build-backend = "maturin"
 [tool.maturin]
 features = ["pyo3/extension-module"]
 
+[tool.uv]
+cache-keys = [{ file = "pyproject.toml" }, { file = "Cargo.toml" }, { file = "src/**/*.rs" }]
+
 [dependency-groups]
 dev = ["pytest>=8.0", "maturin>=1.0"]

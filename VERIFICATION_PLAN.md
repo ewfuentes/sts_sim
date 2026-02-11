@@ -13,6 +13,21 @@ cd /data/code/sts_bot_2
 
 Game must be running with BG mod + CommunicationMod active.
 
+### Starting the Game
+
+From a terminal, launch Slay the Spire via ModTheSpire:
+
+```bash
+cd /home/erick/.steam/debian-installation/steamapps/common/SlayTheSpire
+./jre/bin/java -jar /home/erick/.steam/debian-installation/steamapps/workshop/content/646570/1605060445/ModTheSpire.jar --skip-launcher --skip-intro &
+```
+
+The `--skip-launcher` flag bypasses the mod selection UI (uses previously selected mods).
+The `--skip-intro` flag skips the STS splash screen for faster startup.
+
+**Important:** After rebuilding CommunicationMod (`cd /data/code/CommunicationMod && mvn package`),
+you must restart the game so the new jar is loaded.
+
 ## How to Add a New Card Test
 
 1. Add card to `CARD_TO_BG` in `tests/live/conftest.py` (mapping below)

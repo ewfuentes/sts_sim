@@ -328,8 +328,8 @@ def test_acrobatics_upgraded_magic(game):
     After play: 4 drawn, then 1 discarded.
     """
     hand = [(sts_sim.Card.Acrobatics, True)]
-    draw = [sts_sim.Card.StrikeGreen, sts_sim.Card.DefendGreen,
-            sts_sim.Card.StrikeGreen, sts_sim.Card.DefendGreen]
+    draw = [sts_sim.Card.StrikeGreen, sts_sim.Card.StrikeGreen,
+            sts_sim.Card.StrikeGreen, sts_sim.Card.StrikeGreen]
 
     setup = set_scenario(game, hand=hand, draw_pile=draw, energy=3, monster_hp=30)
     sim = make_sim(hand=hand, draw_pile=draw, energy=3, monster_hp=30)
@@ -1081,23 +1081,67 @@ def test_storm_of_steel_upgraded_magic(game):
     assert_discard_matches(state, sim)
 
 
-def test_doppelganger_upgraded_no_exhaust(game):
-    """Doppelganger+ no longer exhausts (unupgraded exhausts), costs X.
+def test_doppelganger_upgraded_copies_most_recent(game):
+    """Doppelganger+ copies the most recent cost-matching card, goes to discard.
 
-    Setup: Doppelganger+ in hand, energy=3.
-    After play with X=2: gains energy/draw next turn, card in discard (not exhaust).
+    Setup: StrikeGreen + DefendGreen + Doppelganger+, energy=3, monster_hp=30.
+    Play StrikeGreen (damage 1, energy=2).
+    Play DefendGreen (block=1, energy=1).
+    Play Doppelganger+: auto-selects X=1, copies DefendGreen (most recent),
+    block += 1.
+    Assert: block=2, energy=0, Doppelganger+ in discard (not exhaust).
     """
-    hand = [(sts_sim.Card.Doppelganger, True)]
+    hand = [sts_sim.Card.StrikeGreen, sts_sim.Card.DefendGreen,
+            (sts_sim.Card.Doppelganger, True)]
 
     setup = set_scenario(game, hand=hand, energy=3, monster_hp=30)
     sim = make_sim(hand=hand, energy=3, monster_hp=30)
 
-    state = play_named_card(game, sim, setup, sts_sim.Card.Doppelganger,
-                            upgraded=True, choices=[2])
+    # Play StrikeGreen first
+    state = play_named_card(game, sim, setup, sts_sim.Card.StrikeGreen,
+                            target_index=0)
+
+    # Play DefendGreen
+    state = play_named_card(game, sim, setup, sts_sim.Card.DefendGreen)
+
+    # Play Doppelganger+ (auto-selects X=1, copies DefendGreen)
+    state = play_card_both(game, sim, hand_index=0)
 
     assert_player_matches(state, sim)
     assert_discard_matches(state, sim)
     assert_exhaust_matches(state, sim)
+
+
+def test_doppelganger_upgraded_different_costs(game):
+    """Doppelganger+ selects among different cost levels via choice.
+
+    Setup: StrikeGreen + LegSweep + Doppelganger+, energy=5, monster_hp=30.
+    Play StrikeGreen (damage 1, energy=4).
+    Play LegSweep (block + weak, energy=2).
+    Play Doppelganger+ with choices=[0]: selects cost level 1 = StrikeGreen,
+    deals 1 damage.
+    Assert: monster HP=28, energy=1, Doppelganger+ in discard.
+    """
+    hand = [sts_sim.Card.StrikeGreen, sts_sim.Card.LegSweep,
+            (sts_sim.Card.Doppelganger, True)]
+
+    setup = set_scenario(game, hand=hand, energy=5, monster_hp=30)
+    sim = make_sim(hand=hand, energy=5, monster_hp=30)
+
+    # Play StrikeGreen first
+    state = play_named_card(game, sim, setup, sts_sim.Card.StrikeGreen,
+                            target_index=0)
+
+    # Play LegSweep
+    state = play_named_card(game, sim, setup, sts_sim.Card.LegSweep,
+                            target_index=0)
+
+    # Play Doppelganger+ with choice=0 (cost level 1 = StrikeGreen)
+    state = play_card_both(game, sim, hand_index=0, choices=[0])
+
+    assert_monsters_match(state, sim)
+    assert_player_matches(state, sim)
+    assert_discard_matches(state, sim)
 
 
 def test_corpse_explosion_upgraded_magic(game):

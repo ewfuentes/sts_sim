@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 use std::collections::HashMap;
 
-use crate::enums::{Character, Intent, OrbType, PowerType, Relic, Stance};
+use crate::enums::{CardType, Character, Intent, OrbType, PowerType, Relic, Stance};
 
 #[pyclass]
 #[derive(Clone, Debug)]
@@ -36,6 +36,8 @@ pub struct Player {
     pub orb_slots: i32,
     // Watcher stance system
     pub stance: Stance,
+    // Free play: next card of matching type costs 0 energy
+    pub free_play_for: Option<Vec<CardType>>,
 }
 
 #[pymethods]
@@ -69,6 +71,7 @@ impl Player {
             orbs: Vec::new(),
             orb_slots: if ch == Character::Defect { 3 } else { 0 },
             stance: Stance::Neutral,
+            free_play_for: None,
         }
     }
 

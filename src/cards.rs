@@ -506,11 +506,11 @@ impl CardInstance {
             (Card::Blasphemy, _) => 2,
             (Card::DeusExMachina, _) => 0,
             (Card::OmniscienceCard, false) => 3,
-            (Card::OmniscienceCard, true) => 1,
+            (Card::OmniscienceCard, true) => 2,
             (Card::ScrawlCard, false) => 1,
             (Card::ScrawlCard, true) => 0,
             (Card::VaultCard, false) => 3,
-            (Card::VaultCard, true) => 1,
+            (Card::VaultCard, true) => 2,
             (Card::WishCard, _) => 3,
             (Card::SpiritShieldCard, _) => 2,
             (Card::JudgmentCard, _) => 1,
@@ -780,8 +780,7 @@ impl CardInstance {
             (Card::Neutralize, false) => 1,
             (Card::Neutralize, true) => 2,
             // Defect starter
-            (Card::StrikeBlue, false) => 1,
-            (Card::StrikeBlue, true) => 2,
+            (Card::StrikeBlue, _) => 1,  // BG mod: upgrade reduces cost, not increases damage
             // Watcher starter
             (Card::StrikePurple, false) => 1,
             (Card::StrikePurple, true) => 2,
@@ -803,8 +802,7 @@ impl CardInstance {
             (Card::FearNoEvil, true) => 3,
             (Card::ForeignInfluence, false) => 3,
             (Card::ForeignInfluence, true) => 4,
-            (Card::SashWhip, false) => 2,
-            (Card::SashWhip, true) => 3,
+            (Card::SashWhip, _) => 2,  // BG mod: upgrade increases vuln, not damage
             (Card::Tantrum, false) => 2,
             (Card::Tantrum, true) => 1,
             (Card::CarveReality, false) => 3,
@@ -861,14 +859,11 @@ impl CardInstance {
             (Card::BallLightning, false) => 1,
             (Card::BallLightning, true) => 2,
             (Card::Barrage, _) => 1,
-            (Card::BeamCell, false) => 1,
-            (Card::BeamCell, true) => 2,
-            (Card::Claw, false) => 1,
-            (Card::Claw, true) => 2,
+            (Card::BeamCell, _) => 1,  // BG mod: upgrade doesn't increase damage
+            (Card::Claw, _) => 1,  // BG mod: upgrade doesn't increase damage
             (Card::CompileDriver, false) => 1,
             (Card::CompileDriver, true) => 2,
-            (Card::GoForTheEyes, false) => 1,
-            (Card::GoForTheEyes, true) => 2,
+            (Card::GoForTheEyes, _) => 1,  // BG mod: upgrade doesn't increase damage
             (Card::SweepingBeam, false) => 1,
             (Card::SweepingBeam, true) => 2,
             (Card::Blizzard, false) => 2,
@@ -1026,8 +1021,9 @@ impl CardInstance {
             (Card::ForceField, true) => 4,
             (Card::Glacier, false) => 2,
             (Card::Glacier, true) => 3,
-            (Card::Hologram, false) => 1,
-            (Card::Hologram, true) => 2,
+            (Card::Hologram, _) => 1,  // BG mod: upgrade removes exhaust, not increases block
+            (Card::StackCard, false) => 0,
+            (Card::StackCard, true) => 1,
             _ => 0,
         }
     }
@@ -1094,6 +1090,8 @@ impl CardInstance {
             (Card::InfiniteBlades, true) => 2,
             (Card::StormOfSteel, false) => 0,  // bonus
             (Card::StormOfSteel, true) => 1,
+            (Card::Concentrate, false) => 0,  // BG: bonus energy on discard
+            (Card::Concentrate, true) => 1,
             (Card::Malaise, false) => 0,
             (Card::Malaise, true) => 1,
             (Card::Skewer, false) => 1,
@@ -1182,8 +1180,8 @@ impl CardInstance {
             (Card::DefragmentCard, _) => 1,  // orb passive power
             (Card::SeekCard, false) => 1,  // draw from deck
             (Card::SeekCard, true) => 2,
-            (Card::ReinforcedBody, false) => 0,  // X-cost bonus
-            (Card::ReinforcedBody, true) => 1,
+            (Card::ReinforcedBody, false) => 1,  // BG: base adds +1 block
+            (Card::ReinforcedBody, true) => 0,   // BG: upgraded no bonus
             (Card::MultiCast, false) => 0,  // X-cost bonus
             (Card::MultiCast, true) => 1,
             (Card::TempestCard, false) => 0,  // X-cost bonus
@@ -1324,7 +1322,7 @@ impl CardInstance {
             (Card::WishCard, _) => true,
             (Card::WorshipCard, _) => true,
             // Watcher cards that exhaust only when NOT upgraded
-            (Card::Blasphemy, false) => true,
+            (Card::Blasphemy, _) => true,  // BG: always exhausts even when upgraded
             (Card::WreathOfFlameCard, false) => true,
             (Card::SpiritShieldCard, false) => true,
             _ => false,

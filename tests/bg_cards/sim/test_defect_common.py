@@ -19,7 +19,7 @@ def test_ball_lightning_damage_and_channel():
     assert monsters[0].hp == 19
     orbs = sim.player.get_orbs()
     assert len(orbs) == 1
-    assert orbs[0].orb_type == sts_sim.OrbType.Lightning
+    assert orbs[0] == sts_sim.OrbType.Lightning
     assert sim.player.energy == 2
 
 
@@ -33,7 +33,7 @@ def test_ball_lightning_upgraded_deals_2():
     assert monsters[0].hp == 18
     orbs = sim.player.get_orbs()
     assert len(orbs) == 1
-    assert orbs[0].orb_type == sts_sim.OrbType.Lightning
+    assert orbs[0] == sts_sim.OrbType.Lightning
 
 
 def test_ball_lightning_full_orb_slots():
@@ -47,7 +47,7 @@ def test_ball_lightning_full_orb_slots():
     assert monsters[0].hp == 19
     orbs = sim.player.get_orbs()
     assert len(orbs) == 3
-    assert orbs[-1].orb_type == sts_sim.OrbType.Lightning
+    assert orbs[-1] == sts_sim.OrbType.Lightning
 
 
 # ===================================================================
@@ -410,7 +410,7 @@ def test_chaos_lightning_on_low_roll():
     sim.play_card(0)
     orbs = sim.player.get_orbs()
     assert len(orbs) == 1
-    assert orbs[0].orb_type == sts_sim.OrbType.Lightning
+    assert orbs[0] == sts_sim.OrbType.Lightning
     assert sim.player.energy == 2
 
 
@@ -421,7 +421,7 @@ def test_chaos_frost_on_mid_roll():
     sim.play_card(0)
     orbs = sim.player.get_orbs()
     assert len(orbs) == 1
-    assert orbs[0].orb_type == sts_sim.OrbType.Frost
+    assert orbs[0] == sts_sim.OrbType.Frost
 
 
 def test_chaos_dark_on_high_roll():
@@ -431,7 +431,7 @@ def test_chaos_dark_on_high_roll():
     sim.play_card(0)
     orbs = sim.player.get_orbs()
     assert len(orbs) == 1
-    assert orbs[0].orb_type == sts_sim.OrbType.Dark
+    assert orbs[0] == sts_sim.OrbType.Dark
 
 
 def test_chaos_upgraded_costs_0():
@@ -441,7 +441,7 @@ def test_chaos_upgraded_costs_0():
     sim.play_card(0)
     orbs = sim.player.get_orbs()
     assert len(orbs) == 1
-    assert orbs[0].orb_type == sts_sim.OrbType.Frost
+    assert orbs[0] == sts_sim.OrbType.Frost
     assert sim.player.energy == 3
 
 
@@ -457,7 +457,7 @@ def test_coolheaded_channels_frost():
     sim.play_card(0)
     orbs = sim.player.get_orbs()
     assert len(orbs) == 1
-    assert orbs[0].orb_type == sts_sim.OrbType.Frost
+    assert orbs[0] == sts_sim.OrbType.Frost
     assert sim.player.energy == 2
 
 
@@ -474,7 +474,7 @@ def test_coolheaded_upgraded_draws():
     sim.play_card(0)
     orbs = sim.player.get_orbs()
     assert len(orbs) == 1
-    assert orbs[0].orb_type == sts_sim.OrbType.Frost
+    assert orbs[0] == sts_sim.OrbType.Frost
     hand = sim.get_hand()
     assert len(hand) == 1  # drew 1 card
     assert sim.player.energy == 2
@@ -489,10 +489,10 @@ def test_coolheaded_full_orb_slots():
     sim.play_card(0)
     orbs = sim.player.get_orbs()
     assert len(orbs) == 3
-    assert orbs[-1].orb_type == sts_sim.OrbType.Frost
+    assert orbs[-1] == sts_sim.OrbType.Frost
     # Leftmost Lightning was evoked; remaining two are Lightning
-    assert orbs[0].orb_type == sts_sim.OrbType.Lightning
-    assert orbs[1].orb_type == sts_sim.OrbType.Lightning
+    assert orbs[0] == sts_sim.OrbType.Lightning
+    assert orbs[1] == sts_sim.OrbType.Lightning
 
 
 # ===================================================================
@@ -534,7 +534,7 @@ def test_recursion_evokes_and_rechannels_lightning():
     sim.play_card(0)
     orbs = sim.player.get_orbs()
     assert len(orbs) == 1
-    assert orbs[0].orb_type == sts_sim.OrbType.Lightning
+    assert orbs[0] == sts_sim.OrbType.Lightning
     assert sim.player.energy == 2
     # Lightning was evoked -> damage dealt
     monsters = sim.get_monsters()
@@ -550,7 +550,7 @@ def test_recursion_evokes_frost():
     sim.play_card(0)
     orbs = sim.player.get_orbs()
     assert len(orbs) == 1
-    assert orbs[0].orb_type == sts_sim.OrbType.Frost
+    assert orbs[0] == sts_sim.OrbType.Frost
     # Frost evoked -> player gained block
     assert sim.player.block > 0
 
@@ -565,7 +565,7 @@ def test_recursion_upgraded_costs_0():
     assert sim.player.energy == 3
     orbs = sim.player.get_orbs()
     assert len(orbs) == 1
-    assert orbs[0].orb_type == sts_sim.OrbType.Dark
+    assert orbs[0] == sts_sim.OrbType.Dark
 
 
 def test_recursion_no_orbs():

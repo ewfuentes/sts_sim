@@ -56,7 +56,7 @@ def test_cold_snap_base():
     sim.play_card(0, 0)
     assert sim.get_monsters()[0].hp == 18  # 20 - 2 = 18
     orbs = sim.player.get_orbs()
-    assert any(o.orb_type == sts_sim.OrbType.Frost for o in orbs)
+    assert any(o == sts_sim.OrbType.Frost for o in orbs)
     assert sim.player.energy == 2
 
 
@@ -91,7 +91,7 @@ def test_doom_and_gloom_base():
     for m in sim.get_monsters():
         assert m.hp == 18  # 20 - 2 = 18
     orbs = sim.player.get_orbs()
-    assert any(o.orb_type == sts_sim.OrbType.Dark for o in orbs)
+    assert any(o == sts_sim.OrbType.Dark for o in orbs)
     assert sim.player.energy == 1
 
 
@@ -307,7 +307,7 @@ def test_darkness_base():
     sim = make_sim(hand=[sts_sim.Card.DarknessCard], energy=3)
     sim.play_card(0)
     orbs = sim.player.get_orbs()
-    assert any(o.orb_type == sts_sim.OrbType.Dark for o in orbs)
+    assert any(o == sts_sim.OrbType.Dark for o in orbs)
     assert sim.player.energy == 2
 
 
@@ -316,7 +316,7 @@ def test_darkness_upgraded():
     sim = make_sim(hand=[(sts_sim.Card.DarknessCard, True)], energy=3)
     sim.play_card(0)
     orbs = sim.player.get_orbs()
-    assert any(o.orb_type == sts_sim.OrbType.Dark for o in orbs)
+    assert any(o == sts_sim.OrbType.Dark for o in orbs)
     assert sim.player.energy == 3
 
 
@@ -327,7 +327,7 @@ def test_darkness_full_orbs():
                    monsters=[{"hp": 20}])
     sim.play_card(0)
     orbs = sim.player.get_orbs()
-    assert any(o.orb_type == sts_sim.OrbType.Dark for o in orbs)
+    assert any(o == sts_sim.OrbType.Dark for o in orbs)
 
 
 # ===================================================================
@@ -424,7 +424,7 @@ def test_glacier_base():
     sim.play_card(0)
     assert sim.player.block == 2
     orbs = sim.player.get_orbs()
-    assert any(o.orb_type == sts_sim.OrbType.Frost for o in orbs)
+    assert any(o == sts_sim.OrbType.Frost for o in orbs)
     assert sim.player.energy == 1  # 3 - 2 = 1
 
 
@@ -436,7 +436,7 @@ def test_glacier_full_orbs():
     sim.play_card(0)
     assert sim.player.block >= 2
     orbs = sim.player.get_orbs()
-    assert any(o.orb_type == sts_sim.OrbType.Frost for o in orbs)
+    assert any(o == sts_sim.OrbType.Frost for o in orbs)
 
 
 # ===================================================================

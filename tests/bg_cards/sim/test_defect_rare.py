@@ -276,7 +276,7 @@ def test_rainbow_channels_3_orbs():
     sim = make_sim(hand=[sts_sim.Card.RainbowCard], energy=3)
     sim.play_card(0)
     orbs = sim.player.get_orbs()
-    orb_types = [o.orb_type for o in orbs]
+    orb_types = [o for o in orbs]
     assert sts_sim.OrbType.Lightning in orb_types
     assert sts_sim.OrbType.Frost in orb_types
     assert sts_sim.OrbType.Dark in orb_types
@@ -289,7 +289,7 @@ def test_rainbow_upgraded_no_exhaust():
     sim = make_sim(hand=[(sts_sim.Card.RainbowCard, True)], energy=3)
     sim.play_card(0)
     orbs = sim.player.get_orbs()
-    orb_types = [o.orb_type for o in orbs]
+    orb_types = [o for o in orbs]
     assert sts_sim.OrbType.Lightning in orb_types
     assert sts_sim.OrbType.Frost in orb_types
     assert sts_sim.OrbType.Dark in orb_types
@@ -363,7 +363,7 @@ def test_tempest_x3():
     sim = make_sim(hand=[sts_sim.Card.TempestCard], energy=3)
     sim.play_card(0, None, 3)  # X=3
     orbs = sim.player.get_orbs()
-    lightning_count = sum(1 for o in orbs if o.orb_type == sts_sim.OrbType.Lightning)
+    lightning_count = sum(1 for o in orbs if o == sts_sim.OrbType.Lightning)
     assert lightning_count == 3
     assert len(sim.get_exhaust_pile()) == 1
     assert sim.player.energy == 0  # 3 - 3 = 0
@@ -374,7 +374,7 @@ def test_tempest_x0():
     sim = make_sim(hand=[sts_sim.Card.TempestCard], energy=0)
     sim.play_card(0, None, 0)  # X=0
     orbs = sim.player.get_orbs()
-    lightning_count = sum(1 for o in orbs if o.orb_type == sts_sim.OrbType.Lightning)
+    lightning_count = sum(1 for o in orbs if o == sts_sim.OrbType.Lightning)
     assert lightning_count == 0
     assert len(sim.get_exhaust_pile()) == 1
 
@@ -384,7 +384,7 @@ def test_tempest_upgraded():
     sim = make_sim(hand=[(sts_sim.Card.TempestCard, True)], energy=3)
     sim.play_card(0, None, 2)  # X=2, channels X+1 = 3
     orbs = sim.player.get_orbs()
-    lightning_count = sum(1 for o in orbs if o.orb_type == sts_sim.OrbType.Lightning)
+    lightning_count = sum(1 for o in orbs if o == sts_sim.OrbType.Lightning)
     assert lightning_count == 3
     assert len(sim.get_exhaust_pile()) == 1
     assert sim.player.energy == 1  # 3 - 2 = 1
@@ -495,7 +495,7 @@ def test_electrodynamics_channels_2():
     sim = make_sim(hand=[sts_sim.Card.ElectrodynamicsCard], energy=3)
     sim.play_card(0)
     orbs = sim.player.get_orbs()
-    lightning_count = sum(1 for o in orbs if o.orb_type == sts_sim.OrbType.Lightning)
+    lightning_count = sum(1 for o in orbs if o == sts_sim.OrbType.Lightning)
     assert lightning_count == 2
     assert sim.player.energy == 1  # 3 - 2 = 1
 
@@ -505,7 +505,7 @@ def test_electrodynamics_upgraded_channels_3():
     sim = make_sim(hand=[(sts_sim.Card.ElectrodynamicsCard, True)], energy=3)
     sim.play_card(0)
     orbs = sim.player.get_orbs()
-    lightning_count = sum(1 for o in orbs if o.orb_type == sts_sim.OrbType.Lightning)
+    lightning_count = sum(1 for o in orbs if o == sts_sim.OrbType.Lightning)
     assert lightning_count == 3
     assert sim.player.energy == 1  # 3 - 2 = 1
 

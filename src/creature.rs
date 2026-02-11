@@ -31,6 +31,8 @@ pub struct Player {
     pub hand_indices: Vec<usize>, // indices into deck
     pub relics: Vec<Relic>,
     // Defect orb system
+
+    #[pyo3(get, set)]
     pub orbs: Vec<OrbType>,
     #[pyo3(get, set)]
     pub orb_slots: i32,

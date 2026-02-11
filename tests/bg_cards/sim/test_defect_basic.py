@@ -68,9 +68,9 @@ def test_zap_channels_lightning():
     """Zap channels 1 Lightning orb."""
     sim = make_sim(hand=[sts_sim.Card.Zap], energy=3, monster_hp=20)
     sim.play_card(0)
-    orbs = sim.get_orbs()
+    orbs = sim.player.get_orbs()
     assert len(orbs) == 1
-    assert orbs[0].orb_type == sts_sim.OrbType.Lightning
+    assert orbs[0] == sts_sim.OrbType.Lightning
     assert sim.player.energy == 2
 
 
@@ -81,13 +81,13 @@ def test_zap_evokes_oldest_when_full():
         orbs=["Frost", "Frost", "Frost"],
     )
     sim.play_card(0)
-    orbs = sim.get_orbs()
+    orbs = sim.player.get_orbs()
     assert len(orbs) == 3
     # Rightmost should be Lightning (newly channeled)
-    assert orbs[-1].orb_type == sts_sim.OrbType.Lightning
+    assert orbs[-1] == sts_sim.OrbType.Lightning
     # The other two should still be Frost
-    assert orbs[0].orb_type == sts_sim.OrbType.Frost
-    assert orbs[1].orb_type == sts_sim.OrbType.Frost
+    assert orbs[0] == sts_sim.OrbType.Frost
+    assert orbs[1] == sts_sim.OrbType.Frost
 
 
 def test_zap_upgraded_costs_0():
@@ -96,9 +96,9 @@ def test_zap_upgraded_costs_0():
         hand=[(sts_sim.Card.Zap, True)], energy=3, monster_hp=20,
     )
     sim.play_card(0)
-    orbs = sim.get_orbs()
+    orbs = sim.player.get_orbs()
     assert len(orbs) == 1
-    assert orbs[0].orb_type == sts_sim.OrbType.Lightning
+    assert orbs[0] == sts_sim.OrbType.Lightning
     assert sim.player.energy == 3
 
 
@@ -115,7 +115,7 @@ def test_dualcast_evokes_lightning_twice():
     )
     sim.play_card(0)
     # Lightning evoked twice; orb list should be empty
-    orbs = sim.get_orbs()
+    orbs = sim.player.get_orbs()
     assert len(orbs) == 0
     assert sim.player.energy == 2
     # Monster should have taken damage from 2 evocations
@@ -130,7 +130,7 @@ def test_dualcast_evokes_frost_twice():
         player_block=0, orbs=["Frost"],
     )
     sim.play_card(0)
-    orbs = sim.get_orbs()
+    orbs = sim.player.get_orbs()
     assert len(orbs) == 0
     # Player should have gained block from 2 Frost evocations
     assert sim.player.block > 0

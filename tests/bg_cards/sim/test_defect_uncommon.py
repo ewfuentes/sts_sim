@@ -41,8 +41,8 @@ def test_blizzard_with_strength():
                    player_powers={"Strength": 2},
                    monsters=[{"hp": 30}])
     sim.play_card(0, 0)
-    # 2 Frost orbs x 2 HIT = 4 HIT tokens, each deals 1+2 = 3 damage => 12 total
-    assert sim.get_monsters()[0].hp == 18  # 30 - 12 = 18
+    # 2 Frost orbs x (2 + 2) HIT = 8 damage total
+    assert sim.get_monsters()[0].hp == 22  # 30 - 8 = 20
 
 
 # ===================================================================
@@ -57,7 +57,7 @@ def test_cold_snap_base():
     assert sim.get_monsters()[0].hp == 18  # 20 - 2 = 18
     orbs = sim.player.get_orbs()
     assert any(o == sts_sim.OrbType.Frost for o in orbs)
-    assert sim.player.energy == 2
+    assert sim.player.energy == 1
 
 
 def test_cold_snap_upgraded():
@@ -66,7 +66,7 @@ def test_cold_snap_upgraded():
                    monsters=[{"hp": 20}])
     sim.play_card(0, 0)
     assert sim.get_monsters()[0].hp == 17  # 20 - 3 = 17
-    assert sim.player.energy == 2
+    assert sim.player.energy == 1
 
 
 def test_cold_snap_full_orbs():

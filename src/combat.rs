@@ -27,6 +27,7 @@ pub struct CombatState {
     pub die: TheDie,
     rng: StdRng,
     pub stance_changed_this_turn: bool,
+    pub has_card_been_played_this_turn: bool,
     pub cards_played_this_turn: Vec<(usize, Option<usize>)>,
 }
 
@@ -49,6 +50,7 @@ impl CombatState {
             rng: StdRng::seed_from_u64(s.wrapping_add(1)),
             stance_changed_this_turn: false,
             cards_played_this_turn: Vec::new(),
+            has_card_been_played_this_turn: false,
         }
     }
 }
@@ -98,6 +100,8 @@ impl CombatState {
         self.turn_number += 1;
         self.stance_changed_this_turn = false;
         self.cards_played_this_turn.clear();
+        // Tracking for FTL
+        self.has_card_been_played_this_turn = false;
 
         // Barricade: block doesn't reset
         if self.player.get_power(PowerType::Barricade) == 0 {
@@ -872,9 +876,9 @@ impl CombatState {
             }
             Card::FTL => {
                 self.attack_single(target_index, card_inst);
-                // BG mod: draw 1 if fewer than 4 cards played this turn.
-                // In test scenarios (first card played), condition is always met.
-                self.draw_cards(1);
+                if !self.has_card_been_played_this_turn {
+                    self.draw_cards(1);
+                }
             }
             Card::MelterCard => {
                 // BG mod: remove all block first, then deal damage.
@@ -1901,6 +1905,7 @@ impl CombatState {
             }
         }
 
+        self.has_card_been_played_this_turn = true;
         // Check if all monsters dead
         self.check_combat_end();
 

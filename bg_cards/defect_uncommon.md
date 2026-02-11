@@ -24,19 +24,19 @@
   Actions: Play Blizzard.
   Expected: Enemy takes 8 damage (2 Frost orbs x 2 HIT = 4 hits, each hit deals 1+2 Strength = 3 damage, but HIT = 1 per token + Strength adds +1 per HIT, so 4 HIT each dealing 1+2=3 => 12 damage). Correction: 2 HIT per Frost orb x 2 orbs = 4 HIT tokens. Each HIT deals 1 + 2 Strength = 3. Total = 12 damage.
 
-- **Cold Snap** [Y] — BGColdSnap — Attack, Uncommon, Cost 1
+- **Cold Snap** [Y] — BGColdSnap — Attack, Uncommon, Cost 2
   2 HIT. Channel 1 Frost.
   *Upgrade: 3 HIT. Channel 1 Frost.*
 
   - [ ] Sim - [ ] Live — **Test: Basic Cold Snap**
   Setup: Player has 3 energy, Cold Snap in hand, 0 orbs, 3 orb slots. One enemy with 20 HP.
   Actions: Play Cold Snap targeting enemy.
-  Expected: Enemy takes 2 damage (2 HIT). Player channels 1 Frost orb (now has 1 Frost orb in slot 1). Player spends 1 energy.
+  Expected: Enemy takes 2 damage (2 HIT). Player channels 1 Frost orb (now has 1 Frost orb in slot 1). Player spends 2 energy.
 
   - [ ] Sim - [ ] Live — **Test: Cold Snap upgraded**
   Setup: Player has 3 energy, Cold Snap+ in hand, 0 orbs, 3 orb slots. One enemy with 20 HP.
   Actions: Play Cold Snap+ targeting enemy.
-  Expected: Enemy takes 3 damage (3 HIT). Player channels 1 Frost orb. Player spends 1 energy.
+  Expected: Enemy takes 3 damage (3 HIT). Player channels 1 Frost orb. Player spends 2 energy.
 
   - [ ] Sim - [ ] Live — **Test: Cold Snap when orb slots are full**
   Setup: Player has 3 energy, Cold Snap in hand, 3 orb slots all occupied (Lightning, Lightning, Frost). One enemy with 20 HP.

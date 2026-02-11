@@ -276,7 +276,7 @@ def test_sunder_kills_refund():
     sim = make_sim(hand=[sts_sim.Card.Sunder], energy=3,
                    monsters=[{"hp": 4}])
     sim.play_card(0, 0)
-    assert sim.get_monsters()[0].is_gone
+    assert sim.get_monsters()[0].is_dead
     assert sim.player.energy == 3  # spent 3, gained 3
 
 
@@ -294,7 +294,7 @@ def test_sunder_upgraded_kills():
     sim = make_sim(hand=[(sts_sim.Card.Sunder, True)], energy=3,
                    monsters=[{"hp": 6}])
     sim.play_card(0, 0)
-    assert sim.get_monsters()[0].is_gone
+    assert sim.get_monsters()[0].is_dead
     assert sim.player.energy == 3
 
 

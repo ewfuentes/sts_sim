@@ -893,6 +893,10 @@ impl CombatState {
             }
             Card::Sunder => {
                 self.attack_single(target_index, card_inst);
+                let ti = target_index.unwrap();
+                if ti < self.monsters.len() && self.monsters[ti].is_dead() {
+                    self.player.energy += 3;
+                }
             }
             // --- Defect Uncommon Skills ---
             Card::DarknessCard => {

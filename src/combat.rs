@@ -29,6 +29,7 @@ pub struct CombatState {
     pub stance_changed_this_turn: bool,
     pub has_card_been_played_this_turn: bool,
     pub cards_played_this_turn: Vec<(usize, Option<usize>)>,
+    pub player_damaged_this_combat: bool,
 }
 
 impl CombatState {
@@ -51,6 +52,7 @@ impl CombatState {
             stance_changed_this_turn: false,
             cards_played_this_turn: Vec::new(),
             has_card_been_played_this_turn: false,
+            player_damaged_this_combat: false,
         }
     }
 }
@@ -114,12 +116,6 @@ impl CombatState {
         let berserk = self.player.get_power(PowerType::Berserk);
         if berserk > 0 {
             self.player.energy += berserk;
-        }
-
-        // DemonForm: gain Strength at start of turn
-        let demon_form = self.player.get_power(PowerType::DemonForm);
-        if demon_form > 0 {
-            self.player.apply_power(PowerType::Strength, demon_form);
         }
 
         // EnergyPerTurn (Fusion): gain extra energy
@@ -210,7 +206,11 @@ impl CombatState {
         let card_type = card_inst.card.card_type();
         let free_play = self.player.free_play_for.as_ref()
             .map_or(false, |types| types.contains(&card_type));
-        let effective_cost = if corruption && is_skill { 0 } else if free_play { 0 } else { card_inst.cost() };
+        let mut effective_cost = if corruption && is_skill { 0 } else if free_play { 0 } else { card_inst.cost() };
+        // Blood for Blood: cost drops to magic_number after player takes damage
+        if card_inst.card == Card::BloodForBlood && self.player_damaged_this_combat {
+            effective_cost = card_inst.base_magic();
+        }
 
         // Check energy (including miracles as extra energy)
         let miracles = self.player.get_power(PowerType::MiracleCount);
@@ -1541,8 +1541,8 @@ impl CombatState {
             }
             Card::WildStrike => {
                 self.attack_single(target_index, card_inst);
-                // Add Dazed to draw pile
-                self.add_card_to_draw(Card::Dazed);
+                // Add Dazed to discard pile
+                self.add_card_to_discard(Card::Dazed);
             }
 
             // --- Uncommon Attacks ---
@@ -1583,8 +1583,11 @@ impl CombatState {
                 if ti < self.monsters.len() && !self.monsters[ti].is_dead() {
                     let damage = calculate_player_damage(&self.player, &self.monsters[ti], card_inst.base_damage());
                     apply_damage_to_monster(&mut self.monsters[ti], damage);
-                    self.monsters[ti].apply_power(PowerType::Vulnerable, card_inst.base_magic());
-                    self.monsters[ti].apply_power(PowerType::Weak, card_inst.base_magic());
+                    // Base: 1 Vuln + 1 Weak; Upgraded: 2 Vuln + 1 Weak
+                    let vuln_stacks = card_inst.base_magic();
+                    let weak_stacks = 1;
+                    self.monsters[ti].apply_power(PowerType::Vulnerable, vuln_stacks);
+                    self.monsters[ti].apply_power(PowerType::Weak, weak_stacks);
                 }
             }
             Card::Whirlwind => {
@@ -1615,28 +1618,31 @@ impl CombatState {
             Card::FiendFire => {
                 let ti = target_index.unwrap();
                 if ti < self.monsters.len() && !self.monsters[ti].is_dead() {
-                    // Deal damage per card in hand, exhaust all hand cards
+                    // Exhaust all hand cards, then deal one hit per card exhausted
                     let hand_cards: Vec<usize> = self.player.hand_indices.drain(..).collect();
-                    let hit_count = hand_cards.len() as i32;
+                    let hit_count = hand_cards.len();
                     for idx in hand_cards {
                         self.on_exhaust_card(idx);
                     }
-                    let total_damage = calculate_player_damage(&self.player, &self.monsters[ti],
-                        card_inst.base_damage() * hit_count);
-                    apply_damage_to_monster(&mut self.monsters[ti], total_damage);
+                    // Each hit is a separate DamageAction (base_damage + STR each)
+                    for _ in 0..hit_count {
+                        let hit_damage = calculate_player_damage(&self.player, &self.monsters[ti],
+                            card_inst.base_damage());
+                        apply_damage_to_monster(&mut self.monsters[ti], hit_damage);
+                    }
                 }
             }
             Card::Immolate => {
                 self.attack_all_enemies(card_inst);
-                // Add 2 Dazed to draw pile (per BG mod)
-                self.add_card_to_draw(Card::Dazed);
-                self.add_card_to_draw(Card::Dazed);
+                // Add 2 Dazed to discard pile
+                self.add_card_to_discard(Card::Dazed);
+                self.add_card_to_discard(Card::Dazed);
             }
             // --- Common Skills ---
             Card::Flex => {
-                // Gain temporary Strength (removed at end of turn — simplified: just add Str)
+                // Gain temporary Strength (removed at end of turn via LoseStrength)
                 self.player.apply_power(PowerType::Strength, card_inst.base_magic());
-                // TODO: remove temp Str at end of turn
+                self.player.apply_power(PowerType::LoseStrength, card_inst.base_magic());
             }
             Card::Havoc => {
                 // Play the top card of draw pile for free, then exhaust it (unless Power)
@@ -1714,10 +1720,16 @@ impl CombatState {
             }
             Card::PowerThrough => {
                 self.player_gain_block(card_inst.base_block());
-                self.add_card_to_draw(Card::Dazed);
+                self.add_card_to_discard(Card::Dazed);
             }
             Card::RageCard => {
-                self.player.apply_power(PowerType::Rage, 1);
+                // BG mod: gain block equal to number of Attacks in hand
+                let attack_count = self.player.hand_indices.iter()
+                    .filter(|&&idx| self.deck[idx].card.card_type() == CardType::Attack)
+                    .count() as i32;
+                if attack_count > 0 {
+                    self.player_gain_block(attack_count);
+                }
             }
             Card::SecondWind => {
                 // Gain block per non-attack card in hand, exhaust those cards
@@ -1743,16 +1755,23 @@ impl CombatState {
                 // For now, simplified: the exhaust trigger handles it
             }
             Card::Shockwave => {
+                // Base: 1 Vuln + 1 Weak; Upgraded: 1 Vuln + 2 Weak
+                let vuln_stacks = 1;
+                let weak_stacks = card_inst.base_magic();
                 for m in &mut self.monsters {
                     if !m.is_dead() {
-                        m.apply_power(PowerType::Vulnerable, card_inst.base_magic());
-                        m.apply_power(PowerType::Weak, card_inst.base_magic());
+                        m.apply_power(PowerType::Vulnerable, vuln_stacks);
+                        m.apply_power(PowerType::Weak, weak_stacks);
                     }
                 }
             }
             Card::SpotWeakness => {
-                // Simplified: gain 1 Str
-                self.player.apply_power(PowerType::Strength, 1);
+                // Die-based: base succeeds on 1-3, upgraded on 1-4
+                let die_val = self.die.roll();
+                let threshold = if card_inst.upgraded { 4 } else { 3 };
+                if die_val <= threshold {
+                    self.player.apply_power(PowerType::Strength, 1);
+                }
             }
 
             // --- Rare Skills ---
@@ -1852,16 +1871,18 @@ impl CombatState {
 
         // Anger (Nob): deal damage to player when a Skill is played (bypasses block)
         if is_skill {
+            let mut anger_triggered = false;
             for m in &mut self.monsters {
                 if !m.is_dead() {
                     let anger = m.get_power(PowerType::Anger);
                     if anger > 0 {
                         // Thorns-type damage: direct HP loss
                         self.player.hp -= anger;
+                        anger_triggered = true;
                     }
                 }
             }
-            if self.player.is_dead() {
+            if anger_triggered && self.player.is_dead() {
                 self.combat_over = true;
                 self.player_won = false;
                 return true;
@@ -1916,6 +1937,12 @@ impl CombatState {
     pub fn end_player_turn(&mut self) {
         // Safety net: clear free_play_for at end of turn
         self.player.free_play_for = None;
+
+        // DemonForm: gain Strength at end of turn
+        let demon_form = self.player.get_power(PowerType::DemonForm);
+        if demon_form > 0 {
+            self.player.apply_power(PowerType::Strength, demon_form);
+        }
 
         // Metallicize: gain block at end of turn
         let metallicize = self.player.get_power(PowerType::Metallicize);
@@ -2216,6 +2243,21 @@ impl CombatState {
         self.player.discard_pile.push(idx);
     }
 
+    /// Add a card to the exhaust pile.
+    pub fn add_card_to_exhaust(&mut self, card: Card) {
+        let idx = self.deck.len();
+        self.deck.push(CardInstance::new(card, false));
+        self.player.exhaust_pile.push(idx);
+    }
+
+    /// Deal damage to the player (for testing Blood for Blood, etc.)
+    pub fn deal_damage_to_player(&mut self, amount: i32) {
+        let hp_lost = apply_damage_to_player(&mut self.player, amount);
+        if hp_lost > 0 {
+            self.player_damaged_this_combat = true;
+        }
+    }
+
     /// Upgrade a card in the deck by its deck index.
     pub fn upgrade_card(&mut self, deck_index: usize) -> bool {
         if deck_index >= self.deck.len() {
@@ -2487,6 +2529,13 @@ impl CombatState {
     fn on_exhaust_card(&mut self, deck_index: usize) {
         self.player.exhaust_pile.push(deck_index);
 
+        // Sentinel: gain energy when exhausted
+        let card = self.deck[deck_index];
+        if card.card == Card::Sentinel {
+            let energy_gain = if card.upgraded { 3 } else { 2 };
+            self.player.energy += energy_gain;
+        }
+
         // Feel No Pain: gain block on exhaust
         let fnp = self.player.get_power(PowerType::FeelNoPain);
         if fnp > 0 {
@@ -2509,15 +2558,15 @@ impl CombatState {
         }
     }
 
-    /// Player gains block, modified by Dexterity. Also triggers Juggernaut.
+    /// Player gains block, modified by Dexterity and Juggernaut. Also triggers Juggernaut damage.
     fn player_gain_block(&mut self, amount: i32) {
         let dex = self.player.get_power(PowerType::Dexterity);
-        let final_amount = (amount + dex).max(0);
+        let jugg = self.player.get_power(PowerType::Juggernaut);
+        let final_amount = (amount + dex + jugg).max(0);
         if final_amount > 0 {
             self.player.add_block(final_amount);
 
             // Juggernaut: deal damage to random enemy on block gain
-            let jugg = self.player.get_power(PowerType::Juggernaut);
             if jugg > 0 {
                 // Deal damage to first alive monster (deterministic for simulation)
                 for m in &mut self.monsters {

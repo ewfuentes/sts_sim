@@ -696,7 +696,8 @@ impl CardInstance {
             (Card::TrueGrit, _) => 1,
             (Card::Warcry, _) => 0,
             // Uncommon Attacks
-            (Card::BloodForBlood, _) => 3,  // BG mod: upgrade changes magic number, not cost
+            (Card::BloodForBlood, false) => 4,
+            (Card::BloodForBlood, true) => 3,
             (Card::Carnage, _) => 2,
             (Card::Headbutt, _) => 1,
             (Card::Rampage, _) => 1,
@@ -1118,6 +1119,8 @@ impl CardInstance {
             (Card::PerfectedStrike, true) => 2,
             (Card::PommelStrike, false) => 1,  // draw count
             (Card::PommelStrike, true) => 2,
+            (Card::BloodForBlood, false) => 1,  // reduced cost after player takes damage
+            (Card::BloodForBlood, true) => 0,
             (Card::Flex, _) => 1,  // temp Str amount
             (Card::Warcry, false) => 2,  // draw count
             (Card::Warcry, true) => 3,
@@ -1465,7 +1468,7 @@ impl Card {
             Card::Streamline | Card::Sunder |
             Card::AllForOne | Card::CoreSurge | Card::MeteorStrike => true,
             // Skills that target one enemy
-            Card::Disarm | Card::SpotWeakness |
+            Card::Disarm |
             Card::DeadlyPoison | Card::BouncingFlask | Card::Catalyst | Card::LegSweep |
             Card::Terror | Card::Malaise | Card::CorpseExplosionCard |
             Card::JudgmentCard => true,

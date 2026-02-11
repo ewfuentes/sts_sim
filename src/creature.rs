@@ -317,6 +317,7 @@ pub fn power_cap(power: PowerType) -> i32 {
     match power {
         PowerType::Vulnerable => 3,
         PowerType::Weak => 3,
+        PowerType::Strength => 8,
         PowerType::Entangled | PowerType::NoDraw | PowerType::Barricade | PowerType::Corruption => 1,
         _ => 999,
     }

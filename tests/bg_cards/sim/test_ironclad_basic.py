@@ -56,6 +56,8 @@ def test_defend_block_removed_next_turn():
     sim.play_card(0, None)
     assert sim.player.block == 1
     sim.end_player_turn()
+    sim.roll_and_execute_monsters()
+    # Block resets at start of next player turn (inside roll_and_execute_monsters)
     assert sim.player.block == 0
 
 
@@ -82,9 +84,9 @@ def test_bash_upgraded_damage_and_vulnerable():
 
 
 def test_bash_with_strength():
-    """Bash with 1 STR scales per HIT: (1+1) + (1+1) = 4 damage."""
+    """Bash with 1 STR deals 3 damage (2 base + 1 STR)."""
     sim = make_sim(hand=[sts_sim.Card.Bash], energy=3, monster_hp=20,
                    player_powers={"Strength": 1})
     sim.play_card(0, 0)
-    assert sim.get_monsters()[0].hp == 16  # 20 - 4 = 16
+    assert sim.get_monsters()[0].hp == 17  # 20 - 3 = 17
     assert sim.get_monsters()[0].get_power(sts_sim.PowerType.Vulnerable) == 1

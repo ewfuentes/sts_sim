@@ -16,13 +16,13 @@ def test_uppercut_base():
 
 
 def test_uppercut_with_strength():
-    """Uppercut with 2 STR deals 9 damage (3 HIT x 3 per hit)."""
+    """Uppercut with 2 STR deals 5 damage (3 base + 2 STR)."""
     sim = make_sim(
         hand=[sts_sim.Card.Uppercut], energy=3, monster_hp=20,
         player_powers={"Strength": 2},
     )
     sim.play_card(0, 0)
-    assert sim.get_monsters()[0].hp == 11  # 20 - 9
+    assert sim.get_monsters()[0].hp == 15  # 20 - 5
     assert sim.get_monsters()[0].get_power(sts_sim.PowerType.Vulnerable) == 1
     assert sim.get_monsters()[0].get_power(sts_sim.PowerType.Weak) == 1
 
@@ -466,7 +466,7 @@ def test_rampage_with_strength():
     sim.add_card_to_exhaust(sts_sim.Card.StrikeRed)
     sim.add_card_to_exhaust(sts_sim.Card.StrikeRed)
     sim.play_card(0, 0)
-    assert sim.get_monsters()[0].hp == 4  # 2 HIT x (1+2) = 6 damage
+    assert sim.get_monsters()[0].hp == 6  # 2 (exhaust count) + 2 STR = 4 damage
 
 
 # ── Second Wind ──────────────────────────────────────────────────────────
@@ -586,14 +586,14 @@ def test_sever_soul_upgraded():
 
 
 def test_sever_soul_with_strength():
-    """Sever Soul with Strength scales per HIT."""
+    """Sever Soul with 2 STR deals 5 damage (3 base + 2 STR)."""
     sim = make_sim(
         hand=[sts_sim.Card.SeverSoul, sts_sim.Card.StrikeRed],
         energy=3, monster_hp=15,
         player_powers={"Strength": 2},
     )
     sim.play_card(0, 0, 0)  # target enemy, exhaust Strike
-    assert sim.get_monsters()[0].hp == 6  # 15 - 9 (3 HIT x 3 dmg each)
+    assert sim.get_monsters()[0].hp == 10  # 15 - 5
 
 
 # ── Spot Weakness ────────────────────────────────────────────────────────

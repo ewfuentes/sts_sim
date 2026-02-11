@@ -165,10 +165,9 @@ def test_wild_strike_adds_dazed():
     m_hp_before = cs.get_monsters()[0].hp
     cs.play_card(idx, 0)
     assert cs.get_monsters()[0].hp == m_hp_before - 3
-    # Dazed added to draw pile
-    draw = cs.get_draw_pile()
-    assert len(draw) == draw_size_before + 1
-    assert any(ci.card == sts_sim.Card.Dazed for ci in draw)
+    # Dazed added to discard pile
+    discard = cs.get_discard_pile()
+    assert any(ci.card == sts_sim.Card.Dazed for ci in discard)
 
 
 # =========================================================================
@@ -466,18 +465,20 @@ def test_power_through_blocks_and_adds_dazed():
     idx = find_card_in_hand(cs, sts_sim.Card.PowerThrough)
     cs.play_card(idx, None)
     assert cs.player.block == 3
-    draw = cs.get_draw_pile()
-    assert any(ci.card == sts_sim.Card.Dazed for ci in draw)
+    discard = cs.get_discard_pile()
+    assert any(ci.card == sts_sim.Card.Dazed for ci in discard)
 
 
 def test_rage_card_blocks_and_applies_rage():
     cs = make_combat()
     cs.add_card_to_hand(sts_sim.Card.RageCard)
+    # Count attacks already in hand before playing Rage
+    hand = cs.get_hand()
+    attack_count = sum(1 for ci in hand if ci.py_card_type == sts_sim.CardType.Attack)
     idx = find_card_in_hand(cs, sts_sim.Card.RageCard)
     cs.play_card(idx, None)
-    # Rage is a Power — no block on play, block triggers when attacks are played
-    assert cs.player.block == 0
-    assert cs.get_player_power(sts_sim.PowerType.Rage) == 1
+    # BG mod: Rage gives block equal to number of Attacks in hand
+    assert cs.player.block == attack_count
 
 
 def test_second_wind_exhausts_non_attacks_and_blocks():
@@ -685,9 +686,9 @@ def test_immolate_hits_all_and_adds_dazed():
     m_hp_before = cs.get_monsters()[0].hp
     cs.play_card(idx, None)
     assert cs.get_monsters()[0].hp == m_hp_before - 5
-    # BG mod: 2 Dazed added to draw pile (not discard)
-    draw = cs.get_draw_pile()
-    dazed_count = sum(1 for ci in draw if ci.card == sts_sim.Card.Dazed)
+    # BG mod: 2 Dazed added to discard pile
+    discard = cs.get_discard_pile()
+    dazed_count = sum(1 for ci in discard if ci.card == sts_sim.Card.Dazed)
     assert dazed_count == 2
 
 

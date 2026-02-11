@@ -22,13 +22,13 @@ def test_bludgeon_upgraded():
 
 
 def test_bludgeon_with_strength():
-    """Bludgeon with 2 STR deals 21 damage (7 HIT x 3 per hit)."""
+    """Bludgeon with 2 STR deals 9 damage (7 base + 2 STR)."""
     sim = make_sim(
         hand=[sts_sim.Card.Bludgeon], energy=3, monster_hp=30,
         player_powers={"Strength": 2},
     )
     sim.play_card(0, 0)
-    assert sim.get_monsters()[0].hp == 9  # 30 - 21
+    assert sim.get_monsters()[0].hp == 21  # 30 - 9
 
 
 # ── Impervious ───────────────────────────────────────────────────────────
@@ -144,13 +144,13 @@ def test_corruption_upgraded_cost():
 def test_corruption_makes_skills_free_and_exhaust():
     """Corruption makes Skills cost 0 and exhaust them."""
     sim = make_sim(
-        hand=[sts_sim.Card.Corruption, sts_sim.Card.DefendRed],
+        hand=[sts_sim.Card.Corruption, sts_sim.Card.ShrugItOff],
         energy=3, monster_hp=20,
     )
     sim.play_card(0, None)  # Play Corruption (cost 3)
-    sim.play_card(0, None)  # Play Defend (should cost 0, should exhaust)
-    assert sim.player.block == 2  # Defend grants block
-    assert len(sim.get_exhaust_pile()) == 1  # Defend exhausted
+    sim.play_card(0, None)  # Play Shrug It Off (should cost 0, should exhaust)
+    assert sim.player.block == 2  # Shrug It Off grants 2 block
+    assert len(sim.get_exhaust_pile()) == 1  # Shrug It Off exhausted
 
 
 # ── Demon Form ───────────────────────────────────────────────────────────
@@ -364,13 +364,13 @@ def test_immolate_upgraded():
 
 
 def test_immolate_with_strength():
-    """Immolate with 1 STR deals 10 damage (5 HIT x 2 per hit)."""
+    """Immolate with 1 STR deals 6 damage (5 base + 1 STR)."""
     sim = make_sim(
         hand=[sts_sim.Card.Immolate], energy=3, monster_hp=15,
         player_powers={"Strength": 1},
     )
     sim.play_card(0, None)
-    assert sim.get_monsters()[0].hp == 5  # 15 - 10
+    assert sim.get_monsters()[0].hp == 9  # 15 - 6
 
 
 # ── Juggernaut ───────────────────────────────────────────────────────────

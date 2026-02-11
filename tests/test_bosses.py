@@ -230,16 +230,19 @@ def test_slime_boss_half_dead_on_zero_hp():
     """Slime Boss enters half_dead state when HP reaches 0."""
     cs = sts_sim.create_encounter("slime_boss", seed=42)
     cs.start_combat()
-    # Set Slime Boss HP to 1 so next attack kills it
     cs.set_player_hp(10)
-    # Give player enough Str to one-shot the boss (Strike base=1, need 22+ damage)
-    cs.apply_player_power(sts_sim.PowerType.Strength, 25)
-    # Play Strike targeting Slime Boss
-    hand = cs.get_hand()
-    for i, card in enumerate(hand):
-        if card.card == sts_sim.Card.StrikeRed:
-            cs.play_card(i, 0)
-            break
+    cs.set_player_energy(10)
+    cs.apply_player_power(sts_sim.PowerType.Strength, 8)
+    # STR 8 + base 1 = 9 dmg per Strike, boss has 22 HP, need 3 Strikes
+    cs.add_card_to_hand(sts_sim.Card.StrikeRed)
+    cs.add_card_to_hand(sts_sim.Card.StrikeRed)
+    cs.add_card_to_hand(sts_sim.Card.StrikeRed)
+    for _ in range(3):
+        hand = cs.get_hand()
+        for i, card in enumerate(hand):
+            if card.card == sts_sim.Card.StrikeRed:
+                cs.play_card(i, 0)
+                break
     # Combat should NOT be over — boss is half_dead
     assert not cs.combat_over
     monsters = cs.get_monsters()
@@ -250,13 +253,18 @@ def test_slime_boss_splits():
     """Slime Boss should split into 3 slimes after becoming half_dead."""
     cs = sts_sim.create_encounter("slime_boss", seed=42)
     cs.start_combat()
-    # One-shot the boss
-    cs.apply_player_power(sts_sim.PowerType.Strength, 25)
-    hand = cs.get_hand()
-    for i, card in enumerate(hand):
-        if card.card == sts_sim.Card.StrikeRed:
-            cs.play_card(i, 0)
-            break
+    cs.set_player_energy(10)
+    cs.apply_player_power(sts_sim.PowerType.Strength, 8)
+    # STR 8 + base 1 = 9 dmg per Strike, boss has 22 HP, need 3 Strikes
+    cs.add_card_to_hand(sts_sim.Card.StrikeRed)
+    cs.add_card_to_hand(sts_sim.Card.StrikeRed)
+    cs.add_card_to_hand(sts_sim.Card.StrikeRed)
+    for _ in range(3):
+        hand = cs.get_hand()
+        for i, card in enumerate(hand):
+            if card.card == sts_sim.Card.StrikeRed:
+                cs.play_card(i, 0)
+                break
     # Boss is half_dead, combat continues
     assert not cs.combat_over
     # End turn and let monsters act — Slime Boss should split

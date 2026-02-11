@@ -552,11 +552,11 @@ def test_no_draw_cap():
     assert cs.get_player_power(sts_sim.PowerType.NoDraw) == 1
 
 
-def test_strength_no_cap():
-    """Strength should have no practical cap (999)."""
+def test_strength_cap():
+    """Strength is capped at 8 (BG mod rule)."""
     cs = setup_combat(seed=42)
     cs.apply_player_power(sts_sim.PowerType.Strength, 100)
-    assert cs.get_player_power(sts_sim.PowerType.Strength) == 100
+    assert cs.get_player_power(sts_sim.PowerType.Strength) == 8
 
 
 # --- Available actions respects Entangled/Corruption ---

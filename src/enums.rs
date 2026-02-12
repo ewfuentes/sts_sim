@@ -52,11 +52,13 @@ pub enum PowerType {
     // Ironclad-specific
     Berserk,    // Gain 1 energy at start of turn
     // Silent-specific
+    Shiv,           // Shiv token counter (BG resource)
     Poison,         // Deal Poison damage at end of monster turn, reduce by 1
     Accuracy,       // Increase Shiv damage
     AfterImage,     // Gain block when discarding a card
     Envenom,        // Attacks apply poison
-    NoxiousFumes,   // Apply poison at start of turn
+    NoxiousFumes,      // Apply poison to one enemy at start of turn
+    NoxiousFumesAOE,   // Apply poison to all enemies at start of turn
     AThousandCuts,  // Deal damage to all enemies on deck shuffle
     InfiniteBlades, // Generate shivs at start of turn
     WellLaidPlans,  // Retain extra cards

@@ -46,8 +46,8 @@ def test_die_die_die_with_strength():
     )
     sim.play_card(0, None)
     monsters = sim.get_monsters()
-    assert monsters[0].hp == 11  # 20 - 9 = 11
-    assert monsters[1].hp == 6   # 15 - 9 = 6
+    assert monsters[0].hp == 15  # 20 - (3+2) = 15
+    assert monsters[1].hp == 10  # 15 - (3+2) = 10
 
 
 # ===========================================================================
@@ -90,7 +90,7 @@ def test_grand_finale_with_strength():
         monster_hp=30,
     )
     sim.play_card(0, None)
-    assert sim.get_monsters()[0].hp == 10  # 30 - 20 = 10
+    assert sim.get_monsters()[0].hp == 19  # 30 - (10+1) = 19
 
 
 # ===========================================================================
@@ -143,7 +143,7 @@ def test_skewer_with_strength():
 
 
 def test_adrenaline_basic():
-    """Adrenaline gives 2 energy, draws 2 cards, exhausts."""
+    """Adrenaline (base) gives 1 energy, draws 2 cards, exhausts."""
     draw = [sts_sim.Card.StrikeGreen] * 5
     sim = make_sim(
         hand=[sts_sim.Card.Adrenaline],
@@ -151,13 +151,13 @@ def test_adrenaline_basic():
         energy=0,
     )
     sim.play_card(0, None)
-    assert sim.player.energy == 2
+    assert sim.player.energy == 1  # base: +1
     assert len(sim.get_hand()) == 2
     assert len(sim.get_exhaust_pile()) == 1
 
 
 def test_adrenaline_as_turn_starter():
-    """Adrenaline with 3 energy and 2 other cards: 5 energy, 4 cards in hand."""
+    """Adrenaline (base) with 3 energy: 4 energy, 4 cards in hand."""
     draw = [sts_sim.Card.StrikeGreen] * 5
     sim = make_sim(
         hand=[
@@ -169,7 +169,7 @@ def test_adrenaline_as_turn_starter():
         energy=3,
     )
     sim.play_card(0, None)
-    assert sim.player.energy == 5  # 3 + 2 = 5
+    assert sim.player.energy == 4  # 3 + 1 = 4
     assert len(sim.get_hand()) == 4  # 2 existing + 2 drawn
 
 
@@ -265,7 +265,7 @@ def test_malaise_upgraded_with_2_energy():
 
 
 def test_storm_of_steel_discard_3():
-    """Storm of Steel: discard 3 cards, gain 3 SHIV."""
+    """Storm of Steel: discards entire hand (3 cards), gain 3 SHIV."""
     sim = make_sim(
         hand=[
             sts_sim.Card.StormOfSteel,
@@ -275,19 +275,19 @@ def test_storm_of_steel_discard_3():
         ],
         energy=3,
     )
-    sim.play_card(0, None, 3)  # choice=3 to discard 3
+    sim.play_card(0, None)  # discards remaining 3 cards
     assert sim.get_player_power(sts_sim.PowerType.Shiv) == 3
 
 
 def test_storm_of_steel_discard_0():
-    """Storm of Steel: discard 0 cards, gain 0 SHIV."""
+    """Storm of Steel with empty hand: gain 0 SHIV."""
     sim = make_sim(hand=[sts_sim.Card.StormOfSteel], energy=3)
-    sim.play_card(0, None, 0)
+    sim.play_card(0, None)  # no cards left to discard
     assert sim.get_player_power(sts_sim.PowerType.Shiv) == 0
 
 
 def test_storm_of_steel_upgraded_discard_2():
-    """Storm of Steel+: discard 2 cards, gain 2+1=3 SHIV."""
+    """Storm of Steel+: discards 2 cards, gain 2+1=3 SHIV."""
     sim = make_sim(
         hand=[
             (sts_sim.Card.StormOfSteel, True),
@@ -296,7 +296,7 @@ def test_storm_of_steel_upgraded_discard_2():
         ],
         energy=3,
     )
-    sim.play_card(0, None, 2)
+    sim.play_card(0, None)  # discards remaining 2 cards
     assert sim.get_player_power(sts_sim.PowerType.Shiv) == 3
 
 
@@ -449,7 +449,7 @@ def test_envenom_adds_poison_to_hits():
 
 
 def test_envenom_multi_hit():
-    """Envenom with multi-HIT: Die Die Die (3 HIT) = 3 POISON."""
+    """Envenom with single-hit model: Die Die Die (1 HIT) = 1 POISON."""
     sim = make_sim(
         hand=[sts_sim.Card.DieDieDie],
         energy=3,
@@ -457,7 +457,7 @@ def test_envenom_multi_hit():
         monster_hp=20,
     )
     sim.play_card(0, None)
-    assert sim.get_monsters()[0].get_power(sts_sim.PowerType.Poison) == 3
+    assert sim.get_monsters()[0].get_power(sts_sim.PowerType.Poison) == 1
 
 
 def test_envenom_upgraded_costs_2():

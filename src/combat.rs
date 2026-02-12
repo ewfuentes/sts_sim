@@ -30,6 +30,9 @@ pub struct CombatState {
     pub has_card_been_played_this_turn: bool,
     pub cards_played_this_turn: Vec<(usize, Option<usize>)>,
     pub player_damaged_this_combat: bool,
+    pub discarded_this_turn: bool,
+    pub cards_cost_zero_this_turn: bool,
+    pub shivs_played_this_turn: i32,
 }
 
 impl CombatState {
@@ -53,6 +56,9 @@ impl CombatState {
             cards_played_this_turn: Vec::new(),
             has_card_been_played_this_turn: false,
             player_damaged_this_combat: false,
+            discarded_this_turn: false,
+            cards_cost_zero_this_turn: false,
+            shivs_played_this_turn: 0,
         }
     }
 }
@@ -104,6 +110,9 @@ impl CombatState {
         self.cards_played_this_turn.clear();
         // Tracking for FTL
         self.has_card_been_played_this_turn = false;
+        self.discarded_this_turn = false;
+        self.cards_cost_zero_this_turn = false;
+        self.shivs_played_this_turn = 0;
 
         // Barricade: block doesn't reset
         if self.player.get_power(PowerType::Barricade) == 0 {
@@ -170,6 +179,26 @@ impl CombatState {
         if foresight > 0 {
             self.scry(foresight);
         }
+
+        // NoxiousFumes (base): apply poison to first alive enemy at start of turn
+        let noxious = self.player.get_power(PowerType::NoxiousFumes);
+        if noxious > 0 {
+            for m in &mut self.monsters {
+                if !m.is_dead() {
+                    m.apply_power(PowerType::Poison, noxious);
+                    break;
+                }
+            }
+        }
+        // NoxiousFumesAOE (upgraded): apply poison to all enemies at start of turn
+        let noxious_aoe = self.player.get_power(PowerType::NoxiousFumesAOE);
+        if noxious_aoe > 0 {
+            for m in &mut self.monsters {
+                if !m.is_dead() {
+                    m.apply_power(PowerType::Poison, noxious_aoe);
+                }
+            }
+        }
     }
 
     /// Play a card from hand by hand index, targeting monster at target_index.
@@ -210,6 +239,14 @@ impl CombatState {
         // Blood for Blood: cost drops to magic_number after player takes damage
         if card_inst.card == Card::BloodForBlood && self.player_damaged_this_combat {
             effective_cost = card_inst.base_magic();
+        }
+        // MasterfulStab: costs 0 undamaged, base_magic (3/2) when damaged
+        if card_inst.card == Card::MasterfulStab {
+            effective_cost = if self.player_damaged_this_combat { card_inst.base_magic() } else { 0 };
+        }
+        // BulletTime: all cards cost 0 this turn
+        if self.cards_cost_zero_this_turn {
+            effective_cost = 0;
         }
 
         // Check energy (including miracles as extra energy)
@@ -286,24 +323,16 @@ impl CombatState {
             // --- Starter cards ---
             Card::StrikeRed | Card::StrikeGreen | Card::StrikeBlue | Card::StrikePurple => {
                 let conjure = self.player.get_power(PowerType::ConjureBladePower);
-                if conjure > 0 {
-                    let ti = target_index.unwrap();
-                    if ti < self.monsters.len() && !self.monsters[ti].is_dead() {
-                        let damage = calculate_player_damage(&self.player, &self.monsters[ti], card_inst.base_damage() + conjure);
-                        apply_damage_to_monster(&mut self.monsters[ti], damage);
-                    }
-                } else {
-                    self.attack_single(target_index, card_inst);
-                }
+                let ti = target_index.unwrap();
+                self.attack_hit(ti, card_inst.base_damage() + conjure);
             }
             Card::DefendRed | Card::DefendGreen | Card::DefendBlue | Card::DefendPurple => {
                 self.player_gain_block(card_inst.base_block());
             }
             Card::Bash => {
                 let ti = target_index.unwrap();
+                self.attack_hit(ti, card_inst.base_damage());
                 if ti < self.monsters.len() && !self.monsters[ti].is_dead() {
-                    let damage = calculate_player_damage(&self.player, &self.monsters[ti], card_inst.base_damage());
-                    apply_damage_to_monster(&mut self.monsters[ti], damage);
                     self.monsters[ti].apply_power(PowerType::Vulnerable, card_inst.base_magic());
                 }
             }
@@ -311,16 +340,16 @@ impl CombatState {
             // --- Silent Starter ---
             Card::Neutralize => {
                 let ti = target_index.unwrap();
+                self.attack_hit(ti, card_inst.base_damage());
                 if ti < self.monsters.len() && !self.monsters[ti].is_dead() {
-                    let damage = calculate_player_damage(&self.player, &self.monsters[ti], card_inst.base_damage());
-                    apply_damage_to_monster(&mut self.monsters[ti], damage);
                     self.monsters[ti].apply_power(PowerType::Weak, card_inst.base_magic());
                 }
             }
             Card::Survivor => {
                 self.player_gain_block(card_inst.base_block());
-                // Discard 1 card from hand
-                self.discard_random_from_hand();
+                // Discard 1 card from hand with triggers
+                self.discard_from_hand_with_triggers_at(None);
+                self.trigger_after_image();
             }
 
             // --- Defect Starter ---
@@ -351,16 +380,16 @@ impl CombatState {
             // --- Silent Common Attacks ---
             Card::PoisonedStab => {
                 let ti = target_index.unwrap();
+                self.attack_hit(ti, card_inst.base_damage());
                 if ti < self.monsters.len() && !self.monsters[ti].is_dead() {
-                    let damage = calculate_player_damage(&self.player, &self.monsters[ti], card_inst.base_damage());
-                    apply_damage_to_monster(&mut self.monsters[ti], damage);
                     self.monsters[ti].apply_power(PowerType::Poison, card_inst.base_magic());
                 }
             }
             Card::DaggerThrow => {
                 self.attack_single(target_index, card_inst);
                 self.draw_cards(1);
-                self.discard_random_from_hand();
+                self.discard_from_hand_with_triggers_at(None);
+                self.trigger_after_image();
             }
             Card::DaggerSpray => {
                 // Hit all enemies magic_number times
@@ -370,11 +399,16 @@ impl CombatState {
             }
             Card::SneakyStrike => {
                 self.attack_single(target_index, card_inst);
-                // Gain 2 energy if discarded this turn (simplified: always gain)
-                self.player.energy += 2;
+                // Gain 2 energy if a card was discarded this turn
+                if self.discarded_this_turn {
+                    self.player.energy += 2;
+                }
             }
             Card::Slice => {
-                self.attack_single(target_index, card_inst);
+                let ti = target_index.unwrap();
+                let shiv_bonus = if self.shivs_played_this_turn > 0 { card_inst.base_magic() } else { 0 };
+                let base = card_inst.base_damage() + shiv_bonus;
+                self.attack_hit(ti, base);
             }
 
             // --- Silent Common Skills ---
@@ -388,21 +422,22 @@ impl CombatState {
                 }
             }
             Card::Deflect => {
-                self.player_gain_block(card_inst.base_block());
+                let shiv_bonus = if self.player.get_power(PowerType::Shiv) > 0 { card_inst.base_magic() } else { 0 };
+                self.player_gain_block(card_inst.base_block() + shiv_bonus);
             }
             Card::CloakAndDagger => {
                 self.player_gain_block(card_inst.base_block());
-                // Generate shivs (add to shiv counter)
-                // Simplified: no shiv tracking yet
+                self.player.apply_power(PowerType::Shiv, card_inst.base_magic());
             }
             Card::BladeDance => {
-                // Generate shivs (add to shiv counter)
+                self.player.apply_power(PowerType::Shiv, card_inst.base_magic());
             }
             Card::Prepared => {
                 self.draw_cards(card_inst.base_magic());
                 for _ in 0..card_inst.base_magic() {
-                    self.discard_random_from_hand();
+                    self.discard_from_hand_with_triggers_at(None);
                 }
+                self.trigger_after_image();
             }
             Card::DeadlyPoison => {
                 let ti = target_index.unwrap();
@@ -413,7 +448,8 @@ impl CombatState {
             Card::Acrobatics => {
                 self.draw_cards(card_inst.base_magic());
                 // BG mod: forced discard 1 (live choose(0) selects first card)
-                self.discard_random_from_hand();
+                self.discard_from_hand_with_triggers_at(None);
+                self.trigger_after_image();
             }
 
             // --- Silent Uncommon Attacks ---
@@ -421,40 +457,30 @@ impl CombatState {
                 let ti = target_index.unwrap();
                 if ti < self.monsters.len() && !self.monsters[ti].is_dead() {
                     let mut base = card_inst.base_damage();
-                    // Bonus damage if target at full HP
                     if self.monsters[ti].hp == self.monsters[ti].max_hp {
                         base += card_inst.base_magic();
                     }
-                    let damage = calculate_player_damage(&self.player, &self.monsters[ti], base);
-                    apply_damage_to_monster(&mut self.monsters[ti], damage);
+                    self.attack_hit(ti, base);
                 }
             }
             Card::Bane => {
                 let ti = target_index.unwrap();
                 if ti < self.monsters.len() && !self.monsters[ti].is_dead() {
                     let mut base = card_inst.base_damage();
-                    // Bonus damage if target has Poison
                     if self.monsters[ti].get_power(PowerType::Poison) > 0 {
                         base += card_inst.base_magic();
                     }
-                    let damage = calculate_player_damage(&self.player, &self.monsters[ti], base);
-                    apply_damage_to_monster(&mut self.monsters[ti], damage);
+                    self.attack_hit(ti, base);
                 }
             }
             Card::Choke => {
                 let ti = target_index.unwrap();
                 if ti < self.monsters.len() && !self.monsters[ti].is_dead() {
-                    let mut base = card_inst.base_damage();
-                    // Bonus damage per debuff on target
                     let poison = self.monsters[ti].get_power(PowerType::Poison);
                     let weak = self.monsters[ti].get_power(PowerType::Weak);
                     let vuln = self.monsters[ti].get_power(PowerType::Vulnerable);
-                    let debuff_count = (if poison > 0 { 1 } else { 0 }) +
-                                       (if weak > 0 { 1 } else { 0 }) +
-                                       (if vuln > 0 { 1 } else { 0 });
-                    base += card_inst.base_magic() * debuff_count;
-                    let damage = calculate_player_damage(&self.player, &self.monsters[ti], base);
-                    apply_damage_to_monster(&mut self.monsters[ti], damage);
+                    let total = card_inst.base_damage() * (1 + poison + weak + vuln);
+                    self.attack_hit(ti, total);
                 }
             }
             Card::Predator => {
@@ -469,38 +495,52 @@ impl CombatState {
                 self.attack_single(target_index, card_inst);
             }
             Card::Finisher => {
-                // Damage per attack played this turn (simplified: base damage)
-                self.attack_single(target_index, card_inst);
+                // Damage = base_damage * (attacks_played + shivs_played), excluding Finisher itself
+                let attacks = self.cards_played_this_turn.iter()
+                    .filter(|&&(di, _)| di != deck_index && self.deck[di].card.card_type() == CardType::Attack)
+                    .count() as i32;
+                let total_attacks = attacks + self.shivs_played_this_turn;
+                let ti = target_index.unwrap();
+                for _ in 0..total_attacks {
+                    self.attack_hit(ti, card_inst.base_damage());
+                }
             }
             Card::Flechettes => {
                 // BG mod: hit once per skill in hand + magic bonus hits.
                 let ti = target_index.unwrap();
-                if ti < self.monsters.len() && !self.monsters[ti].is_dead() {
-                    let skill_count = self.player.hand_indices.iter()
-                        .filter(|&&idx| self.deck[idx].card.card_type() == CardType::Skill)
-                        .count() as i32;
-                    let hits = skill_count + card_inst.base_magic();
-                    for _ in 0..hits {
-                        if !self.monsters[ti].is_dead() {
-                            let dmg = calculate_player_damage(&self.player, &self.monsters[ti], card_inst.base_damage());
-                            apply_damage_to_monster(&mut self.monsters[ti], dmg);
-                        }
-                    }
+                let skill_count = self.player.hand_indices.iter()
+                    .filter(|&&idx| self.deck[idx].card.card_type() == CardType::Skill)
+                    .count() as i32;
+                let hits = skill_count + card_inst.base_magic();
+                for _ in 0..hits {
+                    self.attack_hit(ti, card_inst.base_damage());
                 }
             }
             Card::AllOutAttack => {
                 self.attack_all_enemies(card_inst);
-                self.discard_random_from_hand();
+                self.discard_from_hand_with_triggers_at(None);
+                self.trigger_after_image();
             }
             Card::Unload => {
-                // BG mod: deals damage + uses BGShivs relic (no discard).
-                // Without the shiv relic, just deals damage.
-                self.attack_single(target_index, card_inst);
+                // BG mod: force-use all shiv tokens with bonus damage, then deal base damage
+                let ti = target_index.unwrap();
+                if ti < self.monsters.len() && !self.monsters[ti].is_dead() {
+                    let shiv_count = self.player.get_power(PowerType::Shiv);
+                    let bonus = card_inst.base_magic();
+                    for _ in 0..shiv_count {
+                        if !self.monsters[ti].is_dead() {
+                            self.use_shiv(ti, bonus);
+                        }
+                    }
+                    // Unload's own hit
+                    self.attack_hit(ti, card_inst.base_damage());
+                }
             }
 
             // --- Silent Uncommon Skills ---
             Card::Blur => {
-                self.player_gain_block(card_inst.base_block() + card_inst.base_magic());
+                let bonus = if self.discarded_this_turn { card_inst.base_magic() } else { 0 };
+                self.player_gain_block(card_inst.base_block() + bonus);
             }
             Card::BouncingFlask => {
                 let ti = target_index.unwrap();
@@ -509,19 +549,23 @@ impl CombatState {
                 }
             }
             Card::Concentrate => {
-                // BG mod: discard remaining hand, gain energy per discard + magic bonus
-                let hand_copy: Vec<usize> = self.player.hand_indices.drain(..).collect();
-                let count = hand_copy.len() as i32;
-                for idx in hand_copy {
-                    self.player.discard_pile.push(idx);
+                // BG mod: discard `choice` cards, gain choice + magic energy
+                let discard_count = choice.unwrap_or(0) as i32;
+                for _ in 0..discard_count {
+                    self.discard_from_hand_with_triggers_at(None);
                 }
-                self.player.energy += count + card_inst.base_magic();
+                if discard_count > 0 {
+                    self.trigger_after_image();
+                }
+                self.player.energy += discard_count + card_inst.base_magic();
             }
             Card::CalculatedGamble => {
                 let hand_size = self.player.hand_indices.len() as i32;
-                let hand_copy: Vec<usize> = self.player.hand_indices.drain(..).collect();
-                for idx in hand_copy {
-                    self.player.discard_pile.push(idx);
+                for _ in 0..hand_size {
+                    self.discard_from_hand_with_triggers_at(None);
+                }
+                if hand_size > 0 {
+                    self.trigger_after_image();
                 }
                 self.draw_cards(hand_size);
             }
@@ -583,11 +627,13 @@ impl CombatState {
                 }
             }
             Card::Expertise => {
-                // Draw cards (simplified)
-                self.draw_cards(card_inst.base_magic());
+                // Draw up to base_magic total hand size
+                let hand_size = self.player.hand_indices.len() as i32;
+                let draw_count = (card_inst.base_magic() - hand_size).max(0);
+                self.draw_cards(draw_count);
             }
             Card::RiddleWithHoles => {
-                // Generate shivs
+                self.player.apply_power(PowerType::Shiv, card_inst.base_magic());
             }
             Card::Setup => {
                 self.player.energy += card_inst.base_magic();
@@ -614,25 +660,22 @@ impl CombatState {
                 self.player.energy = max_x - x;
                 let hits = x + card_inst.base_magic();
                 let ti = target_index.unwrap();
-                if ti < self.monsters.len() && !self.monsters[ti].is_dead() {
-                    for _ in 0..hits {
-                        let damage = calculate_player_damage(&self.player, &self.monsters[ti], card_inst.base_damage());
-                        apply_damage_to_monster(&mut self.monsters[ti], damage);
-                    }
+                for _ in 0..hits {
+                    self.attack_hit(ti, card_inst.base_damage());
                 }
             }
 
             // --- Silent Rare Skills ---
             Card::Adrenaline => {
-                let energy_gain = if card_inst.upgraded { 2 } else { 1 };
-                self.player.energy += energy_gain;
+                self.player.energy += if card_inst.upgraded { 2 } else { 1 };
                 self.draw_cards(2);
             }
             Card::BulletTime => {
                 self.player.apply_power(PowerType::NoDraw, 1);
+                self.cards_cost_zero_this_turn = true;
             }
             Card::Malaise => {
-                // X-cost: apply X + magic weak
+                // X-cost: apply X + magic weak AND X + magic poison
                 let max_x = self.player.energy + effective_cost;
                 let x = choice.map(|c| (c as i32).min(max_x)).unwrap_or(max_x);
                 self.player.energy = max_x - x;
@@ -640,14 +683,19 @@ impl CombatState {
                 let ti = target_index.unwrap();
                 if ti < self.monsters.len() && !self.monsters[ti].is_dead() {
                     self.monsters[ti].apply_power(PowerType::Weak, weak_amount);
+                    self.monsters[ti].apply_power(PowerType::Poison, weak_amount);
                 }
             }
             Card::StormOfSteel => {
-                // BG mod: discard remaining hand, generate shivs (tracked by relic)
-                let hand_copy: Vec<usize> = self.player.hand_indices.drain(..).collect();
-                for idx in hand_copy {
-                    self.player.discard_pile.push(idx);
+                // Discard entire hand, gain (discarded + base_magic) shivs
+                let hand_size = self.player.hand_indices.len() as i32;
+                for _ in 0..hand_size {
+                    self.discard_from_hand_with_triggers_at(None);
                 }
+                if hand_size > 0 {
+                    self.trigger_after_image();
+                }
+                self.player.apply_power(PowerType::Shiv, hand_size + card_inst.base_magic());
             }
             Card::Doppelganger => {
                 // X-cost: copy and replay most recent card whose cost matches X.
@@ -722,7 +770,11 @@ impl CombatState {
                 self.player.apply_power(PowerType::Dexterity, card_inst.base_magic());
             }
             Card::NoxiousFumesCard => {
-                self.player.apply_power(PowerType::NoxiousFumes, card_inst.base_magic());
+                if card_inst.upgraded {
+                    self.player.apply_power(PowerType::NoxiousFumesAOE, card_inst.base_magic());
+                } else {
+                    self.player.apply_power(PowerType::NoxiousFumes, card_inst.base_magic());
+                }
             }
             Card::WellLaidPlansCard => {
                 self.player.apply_power(PowerType::WellLaidPlans, card_inst.base_magic());
@@ -1889,6 +1941,22 @@ impl CombatState {
             }
         }
 
+        // Burst: replay the skill as a full card play
+        if is_skill && self.player.get_power(PowerType::Burst) > 0 {
+            self.player.reduce_power(PowerType::Burst, 1);
+            // Find the card in discard or exhaust pile and re-add to hand
+            if let Some(pos) = self.player.discard_pile.iter().position(|&i| i == deck_index) {
+                self.player.discard_pile.remove(pos);
+            } else if let Some(pos) = self.player.exhaust_pile.iter().position(|&i| i == deck_index) {
+                self.player.exhaust_pile.remove(pos);
+            }
+            self.player.hand_indices.push(deck_index);
+            let replay_pos = self.player.hand_indices.len() - 1;
+            self.player.free_play_for = Some(vec![CardType::Skill]);
+            self.play_card(replay_pos, target_index, choice);
+            return true;
+        }
+
         // DoubleTap: replay the attack as a full card play
         if is_attack && self.player.get_power(PowerType::DoubleTap) > 0 {
             self.player.reduce_power(PowerType::DoubleTap, 1);
@@ -2327,7 +2395,16 @@ impl CombatState {
 
             let free_play = self.player.free_play_for.as_ref()
                 .map_or(false, |types| types.contains(&ci.card.card_type()));
-            let effective_cost = if corruption && is_skill { 0 } else if free_play { 0 } else { ci.cost() };
+            let mut effective_cost = if corruption && is_skill { 0 } else if free_play { 0 } else { ci.cost() };
+            if ci.card == Card::BloodForBlood && self.player_damaged_this_combat {
+                effective_cost = ci.base_magic();
+            }
+            if ci.card == Card::MasterfulStab {
+                effective_cost = if self.player_damaged_this_combat { ci.base_magic() } else { 0 };
+            }
+            if self.cards_cost_zero_this_turn {
+                effective_cost = 0;
+            }
             if effective_cost <= total_energy {
                 actions.push((hand_idx, ci, ci.card.has_target()));
             }
@@ -2371,6 +2448,42 @@ impl CombatState {
     /// Set player HP directly (for testing).
     pub fn set_player_hp(&mut self, hp: i32) {
         self.player.hp = hp;
+        if hp < self.player.max_hp {
+            self.player_damaged_this_combat = true;
+        }
+    }
+
+    /// Set player max HP directly (for testing).
+    pub fn set_player_max_hp(&mut self, max_hp: i32) {
+        self.player.max_hp = max_hp;
+    }
+
+    /// Use a shiv token: decrement Shiv power, deal (1 + Accuracy + bonus) damage,
+    /// increment shivs_played_this_turn. Returns true if a shiv was used.
+    #[pyo3(signature = (target_index, bonus_damage=0))]
+    pub fn use_shiv(&mut self, target_index: usize, bonus_damage: i32) -> bool {
+        let shiv = self.player.get_power(PowerType::Shiv);
+        if shiv <= 0 {
+            return false;
+        }
+        if target_index >= self.monsters.len() || self.monsters[target_index].is_dead() {
+            return false;
+        }
+        // Decrement shiv counter
+        self.player.apply_power(PowerType::Shiv, -1);
+        // Shiv damage = 1 + accuracy + bonus_damage, affected by STR via attack_hit
+        let accuracy = self.player.get_power(PowerType::Accuracy);
+        let base = 1 + accuracy + bonus_damage;
+        self.attack_hit(target_index, base);
+        self.shivs_played_this_turn += 1;
+        true
+    }
+
+    /// Directly damage a monster by index (for testing).
+    pub fn damage_monster(&mut self, index: usize, amount: i32) {
+        if index < self.monsters.len() {
+            self.monsters[index].hp -= amount;
+        }
     }
 
     /// Set the number of orb slots the player has.
@@ -2391,6 +2504,11 @@ impl CombatState {
     /// Remove all orbs from the player.
     pub fn clear_orbs(&mut self) {
         self.player.orbs.clear();
+    }
+
+    /// Discard a specific card from hand by hand index (with on-discard triggers).
+    pub fn discard_card_from_hand(&mut self, hand_index: usize) -> bool {
+        self.discard_from_hand_with_triggers_at(Some(hand_index))
     }
 
     /// Clear all player relics.
@@ -2558,7 +2676,7 @@ impl CombatState {
         }
     }
 
-    /// Player gains block, modified by Dexterity and Juggernaut. Also triggers Juggernaut damage.
+    /// Player gains block, modified by Dexterity (multiplicative) and Juggernaut (additive).
     fn player_gain_block(&mut self, amount: i32) {
         let dex = self.player.get_power(PowerType::Dexterity);
         let jugg = self.player.get_power(PowerType::Juggernaut);
@@ -2579,22 +2697,32 @@ impl CombatState {
         }
     }
 
+    /// Centralized attack helper: calculate damage, apply to monster, trigger envenom.
+    /// Returns the HP damage dealt (after block).
+    fn attack_hit(&mut self, target_index: usize, base_damage: i32) -> i32 {
+        if target_index >= self.monsters.len() || self.monsters[target_index].is_dead() {
+            return 0;
+        }
+        let damage = calculate_player_damage(&self.player, &self.monsters[target_index], base_damage);
+        let hp_damage = apply_damage_to_monster(&mut self.monsters[target_index], damage);
+        // Envenom: apply poison on any attack hit
+        let envenom = self.player.get_power(PowerType::Envenom);
+        if envenom > 0 && !self.monsters[target_index].is_dead() {
+            self.monsters[target_index].apply_power(PowerType::Poison, envenom);
+        }
+        hp_damage
+    }
+
     /// Helper: deal single-target attack damage using card's base damage.
     fn attack_single(&mut self, target_index: Option<usize>, card_inst: CardInstance) {
         let ti = target_index.unwrap();
-        if ti < self.monsters.len() && !self.monsters[ti].is_dead() {
-            let damage = calculate_player_damage(&self.player, &self.monsters[ti], card_inst.base_damage());
-            apply_damage_to_monster(&mut self.monsters[ti], damage);
-        }
+        self.attack_hit(ti, card_inst.base_damage());
     }
 
     /// Helper: deal damage to all alive enemies.
     fn attack_all_enemies(&mut self, card_inst: CardInstance) {
         for i in 0..self.monsters.len() {
-            if !self.monsters[i].is_dead() {
-                let damage = calculate_player_damage(&self.player, &self.monsters[i], card_inst.base_damage());
-                apply_damage_to_monster(&mut self.monsters[i], damage);
-            }
+            self.attack_hit(i, card_inst.base_damage());
         }
     }
 
@@ -2611,6 +2739,50 @@ impl CombatState {
         if !self.player.hand_indices.is_empty() {
             let idx = self.player.hand_indices.remove(0);
             self.player.discard_pile.push(idx);
+        }
+    }
+
+    /// Discard from hand with on-discard triggers (Reflex, Tactician).
+    /// If hand_index is Some, discard that specific card; otherwise discard last card.
+    /// Sets discarded_this_turn. Returns true if a card was discarded.
+    fn discard_from_hand_with_triggers_at(&mut self, hand_index: Option<usize>) -> bool {
+        if self.player.hand_indices.is_empty() {
+            return false;
+        }
+        let idx = match hand_index {
+            Some(hi) if hi < self.player.hand_indices.len() => {
+                self.player.hand_indices.remove(hi)
+            }
+            _ => self.player.hand_indices.pop().unwrap(),
+        };
+        self.player.discard_pile.push(idx);
+        self.discarded_this_turn = true;
+
+        let card = self.deck[idx];
+        // Reflex: draw base_magic cards when discarded
+        if card.card == Card::Reflex {
+            let draw_count = card.base_magic();
+            self.draw_cards(draw_count);
+        }
+        // Tactician: gain base_magic energy when discarded, move to exhaust
+        if card.card == Card::Tactician {
+            let energy_gain = card.base_magic();
+            self.player.energy += energy_gain;
+            // Move from discard to exhaust
+            if let Some(pos) = self.player.discard_pile.iter().position(|&i| i == idx) {
+                self.player.discard_pile.remove(pos);
+                self.player.exhaust_pile.push(idx);
+            }
+        }
+
+        true
+    }
+
+    /// Trigger AfterImage: gain block if AfterImage power > 0.
+    fn trigger_after_image(&mut self) {
+        let after_image = self.player.get_power(PowerType::AfterImage);
+        if after_image > 0 {
+            self.player_gain_block(after_image);
         }
     }
 

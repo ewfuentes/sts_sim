@@ -284,6 +284,11 @@ impl Monster {
         self.block += amount;
     }
 
+    /// Directly reduce HP by amount (for testing scenarios).
+    pub fn apply_damage(&mut self, amount: i32) {
+        self.hp -= amount;
+    }
+
     pub fn apply_power(&mut self, power: PowerType, amount: i32) {
         // Artifact blocks debuffs
         if amount > 0 && is_debuff(power) {

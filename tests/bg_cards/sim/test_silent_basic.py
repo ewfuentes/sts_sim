@@ -26,14 +26,14 @@ def test_strike_green_with_strength():
 
 
 def test_strike_green_upgraded():
-    """Upgraded Strike deals 2 HIT (each boosted by STR)."""
+    """Upgraded Strike deals 2 base + 1 STR = 3 damage."""
     sim = make_sim(
         hand=[(sts_sim.Card.StrikeGreen, True)], energy=3, monster_hp=10,
         player_powers={"Strength": 1},
     )
     sim.play_card(0, 0)
-    # 2 HIT, each dealing 1+1 STR = 2 damage each = 4 total
-    assert sim.get_monsters()[0].hp == 6
+    # Single-hit: 2 base + 1 STR = 3 damage
+    assert sim.get_monsters()[0].hp == 7
 
 
 # ---------------------------------------------------------------------------
@@ -83,14 +83,14 @@ def test_neutralize_with_strength():
 
 
 def test_neutralize_upgraded():
-    """Upgraded Neutralize deals 2 HIT and applies 1 Weak."""
+    """Upgraded Neutralize deals 2 base + 1 STR = 3 damage and applies 1 Weak."""
     sim = make_sim(
         hand=[(sts_sim.Card.Neutralize, True)], energy=3, monster_hp=10,
         player_powers={"Strength": 1},
     )
     sim.play_card(0, 0)
-    # 2 HIT, each dealing 1+1 STR = 2 damage each = 4 total
-    assert sim.get_monsters()[0].hp == 6
+    # Single-hit: 2 base + 1 STR = 3 damage
+    assert sim.get_monsters()[0].hp == 7
     assert sim.get_monsters()[0].get_power(sts_sim.PowerType.Weak) == 1
 
 

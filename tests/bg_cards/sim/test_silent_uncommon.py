@@ -19,14 +19,14 @@ def test_backstab_damaged_enemy_no_bonus():
     """Backstab deals 2 damage when enemy is NOT at full HP."""
     sim = make_sim(hand=[sts_sim.Card.Backstab], energy=3, monster_hp=20)
     # Damage the enemy first so it's not at full HP
-    sim.get_monsters()[0].apply_damage(5)
+    sim.damage_monster(0, 5)
     hp_before = sim.get_monsters()[0].hp  # 15
     sim.play_card(0, 0)
     assert sim.get_monsters()[0].hp == hp_before - 2  # 15 - 2 = 13
 
 
 def test_backstab_upgraded_full_hp_with_strength():
-    """Backstab+ deals 4*(1+1)+2=10 damage with 1 STR against full HP enemy."""
+    """Backstab+ deals 4+2+1=7 damage with 1 STR against full HP enemy."""
     sim = make_sim(
         hand=[(sts_sim.Card.Backstab, True)],
         energy=3,
@@ -34,7 +34,7 @@ def test_backstab_upgraded_full_hp_with_strength():
         monster_hp=20,
     )
     sim.play_card(0, 0)
-    assert sim.get_monsters()[0].hp == 10  # 20 - 10 = 10
+    assert sim.get_monsters()[0].hp == 13  # 20 - 7 = 13
 
 
 def test_backstab_exhausts():
@@ -70,7 +70,7 @@ def test_bane_no_poison_no_bonus():
 
 
 def test_bane_upgraded_poisoned_with_strength():
-    """Bane+ deals 3*(1+2)+2=11 damage with 2 STR against poisoned enemy."""
+    """Bane+ deals 3+2+2=7 damage with 2 STR against poisoned enemy."""
     sim = make_sim(
         hand=[(sts_sim.Card.Bane, True)],
         energy=3,
@@ -79,7 +79,7 @@ def test_bane_upgraded_poisoned_with_strength():
         monster_powers={"Poison": 1},
     )
     sim.play_card(0, 0)
-    assert sim.get_monsters()[0].hp == 19  # 30 - 11 = 19
+    assert sim.get_monsters()[0].hp == 23  # 30 - 7 = 23
 
 
 # ===========================================================================
@@ -162,7 +162,7 @@ def test_predator_with_strength():
         monster_hp=20,
     )
     sim.play_card(0, 0)
-    assert sim.get_monsters()[0].hp == 11  # 20 - 9 = 11
+    assert sim.get_monsters()[0].hp == 15  # 20 - (3+2) = 15
 
 
 # ===========================================================================
@@ -171,25 +171,24 @@ def test_predator_with_strength():
 
 
 def test_masterful_stab_full_cost():
-    """Masterful Stab costs 4 energy when player has not lost HP."""
-    sim = make_sim(hand=[sts_sim.Card.MasterfulStab], energy=4, monster_hp=20)
+    """Masterful Stab costs 0 energy when player has not been damaged."""
+    sim = make_sim(hand=[sts_sim.Card.MasterfulStab], energy=3, monster_hp=20)
     sim.play_card(0, 0)
     assert sim.get_monsters()[0].hp == 18  # 20 - 2 = 18
-    assert sim.player.energy == 0  # 4 - 4 = 0
+    assert sim.player.energy == 3  # costs 0 when undamaged
 
 
 def test_masterful_stab_reduced_cost():
-    """Masterful Stab costs 2 energy when player lost HP this combat."""
+    """Masterful Stab costs 3 energy when player lost HP this combat."""
     sim = make_sim(hand=[sts_sim.Card.MasterfulStab], energy=3, player_hp=7, monster_hp=20)
-    # Simulate HP loss by marking player as having lost HP
-    sim.set_player_hp(7)  # Below max of 9, simulating HP loss
+    sim.set_player_hp(7)  # Below max of 9, sets player_damaged_this_combat
     sim.play_card(0, 0)
     assert sim.get_monsters()[0].hp == 18  # 20 - 2 = 18
-    assert sim.player.energy == 1  # 3 - 2 = 1
+    assert sim.player.energy == 0  # 3 - 3 = 0
 
 
 def test_masterful_stab_upgraded_reduced_cost():
-    """Masterful Stab+ costs 1 energy when player lost HP this combat."""
+    """Masterful Stab+ costs 2 energy when player lost HP this combat."""
     sim = make_sim(
         hand=[(sts_sim.Card.MasterfulStab, True)],
         energy=3,
@@ -198,7 +197,7 @@ def test_masterful_stab_upgraded_reduced_cost():
     )
     sim.play_card(0, 0)
     assert sim.get_monsters()[0].hp == 17  # 20 - 3 = 17
-    assert sim.player.energy == 2  # 3 - 1 = 2
+    assert sim.player.energy == 1  # 3 - 2 = 1
 
 
 # ===========================================================================
@@ -230,7 +229,7 @@ def test_dash_upgraded():
 
 
 def test_dash_with_footwork():
-    """Dash with Footwork: 2 damage, 2*(1+1)=4 block."""
+    """Dash with Dexterity: 2 damage, 2+1=3 block (additive)."""
     sim = make_sim(
         hand=[sts_sim.Card.Dash],
         energy=3,
@@ -240,7 +239,7 @@ def test_dash_with_footwork():
     )
     sim.play_card(0, 0)
     assert sim.get_monsters()[0].hp == 18  # 20 - 2 = 18
-    assert sim.player.block == 4  # 2*(1+1) = 4
+    assert sim.player.block == 3  # 2 + 1 dex = 3
 
 
 # ===========================================================================
@@ -451,7 +450,7 @@ def test_blur_after_discard():
 
 
 def test_blur_upgraded_after_discard_with_footwork():
-    """Blur+ after discard with Footwork: (3+1)*(1+1)=8 block."""
+    """Blur+ without discard with Dexterity: 3 + 1 = 4 block (additive)."""
     sim = make_sim(
         hand=[(sts_sim.Card.Blur, True)],
         energy=3,
@@ -459,8 +458,8 @@ def test_blur_upgraded_after_discard_with_footwork():
         player_powers={"Dexterity": 1},
     )
     sim.play_card(0, None)
-    # Without discard: 3 BLK * (1+1) = 6 block (Footwork/Dexterity adds per BLK token)
-    assert sim.player.block == 6
+    # Without discard: 3 base + 1 dex = 4 block
+    assert sim.player.block == 4
 
 
 # ===========================================================================
@@ -656,7 +655,7 @@ def test_leg_sweep_basic():
 
 
 def test_leg_sweep_upgraded_with_footwork():
-    """Leg Sweep+ with Footwork: 1 WEAK, 4*(1+1)=8 block."""
+    """Leg Sweep+ with Dexterity: 1 WEAK, 4+1=5 block (additive)."""
     sim = make_sim(
         hand=[(sts_sim.Card.LegSweep, True)],
         energy=3,
@@ -666,7 +665,7 @@ def test_leg_sweep_upgraded_with_footwork():
     )
     sim.play_card(0, 0)
     assert sim.get_monsters()[0].get_power(sts_sim.PowerType.Weak) == 1
-    assert sim.player.block == 8  # 4*(1+1) = 8
+    assert sim.player.block == 5  # 4 + 1 dex = 5
 
 
 def test_leg_sweep_stacking_weak():
@@ -687,10 +686,10 @@ def test_leg_sweep_stacking_weak():
 
 
 def test_outmaneuver_played_immediately():
-    """Outmaneuver played immediately gives no bonus energy. Costs 1."""
+    """Outmaneuver played immediately gives no bonus energy. Costs 0."""
     sim = make_sim(hand=[sts_sim.Card.Outmaneuver], energy=3)
     sim.play_card(0, None)
-    assert sim.player.energy == 2  # 3 - 1 = 2
+    assert sim.player.energy == 3  # costs 0
 
 
 # ===========================================================================
@@ -872,10 +871,10 @@ def test_riddle_with_holes_stacks():
 
 
 def test_setup_give_energy_to_self():
-    """Setup grants 1 energy to self (net 0 after cost). Exhausts."""
+    """Setup costs 0, grants 1 energy to self. Exhausts."""
     sim = make_sim(hand=[sts_sim.Card.Setup], energy=3)
     sim.play_card(0, None)
-    assert sim.player.energy == 3  # 3 - 1 + 1 = 3
+    assert sim.player.energy == 4  # 3 - 0 + 1 = 4
     assert len(sim.get_exhaust_pile()) == 1
 
 
@@ -931,32 +930,32 @@ def test_terror_stacks_vuln():
 
 
 def test_footwork_boosts_block():
-    """Footwork boosts subsequent BLK cards: Defend 1 BLK -> 2 block."""
+    """Footwork boosts subsequent BLK cards: Defend 1 + 1 dex = 2 block."""
     sim = make_sim(
         hand=[sts_sim.Card.FootworkCard, sts_sim.Card.DefendGreen],
-        energy=3,
+        energy=4,  # Footwork costs 3, Defend costs 1
         player_block=0,
     )
-    sim.play_card(0, None)  # Play Footwork
-    sim.play_card(0, None)  # Play Defend
-    assert sim.player.block == 2  # 1*(1+1) = 2
+    sim.play_card(0, None)  # Play Footwork (cost 3)
+    sim.play_card(0, None)  # Play Defend (cost 1)
+    assert sim.player.block == 2  # 1 + 1 dex = 2
 
 
 def test_footwork_stacks():
-    """Two Footworks stack: Defend 1 BLK -> 3 block."""
+    """Two Footworks stack: Defend 1 + 2 dex = 3 block."""
     sim = make_sim(
         hand=[
             sts_sim.Card.FootworkCard,
             sts_sim.Card.FootworkCard,
             sts_sim.Card.DefendGreen,
         ],
-        energy=3,
+        energy=7,  # 3 + 3 + 1
         player_block=0,
     )
-    sim.play_card(0, None)  # Play Footwork 1
-    sim.play_card(0, None)  # Play Footwork 2
-    sim.play_card(0, None)  # Play Defend
-    assert sim.player.block == 3  # 1*(1+2) = 3
+    sim.play_card(0, None)  # Play Footwork 1 (cost 3)
+    sim.play_card(0, None)  # Play Footwork 2 (cost 3)
+    sim.play_card(0, None)  # Play Defend (cost 1)
+    assert sim.player.block == 3  # 1 + 2 dex = 3
 
 
 # ===========================================================================

@@ -148,17 +148,16 @@ def test_slice_deals_damage():
 
 
 def test_sneaky_strike_deals_damage_and_gains_energy():
-    """SneakyStrike deals damage and gains 2 energy."""
+    """SneakyStrike deals damage; +2 energy only if discarded this turn."""
     cs = make_combat()
     cs.start_combat()
     cs.set_player_energy(3)
     hi = setup_card(cs, sts_sim.Card.SneakyStrike, energy=3)
     hp_before = cs.get_monsters()[0].hp
-    energy_before = cs.player.energy
     cs.play_card(hi, 0)
     assert cs.get_monsters()[0].hp < hp_before
-    # Cost 2, then +2 energy = net 0
-    assert cs.player.energy == energy_before - 2 + 2
+    # Cost 2, no discard this turn so no +2 bonus
+    assert cs.player.energy == 1
 
 
 def test_dagger_throw_attacks_draws_discards():
@@ -237,7 +236,7 @@ def test_bane_no_bonus_if_not_poisoned():
 
 
 def test_choke_bonus_per_debuff():
-    """Choke deals bonus damage per debuff on target."""
+    """Choke deals base_damage * (1 + debuff_count) damage."""
     cs = make_combat()
     cs.start_combat()
     # Apply poison and weak first
@@ -245,12 +244,12 @@ def test_choke_bonus_per_debuff():
     cs.play_card(hi, 0)
     hi = setup_card(cs, sts_sim.Card.Neutralize)
     cs.play_card(hi, 0)
-    # Target has Poison and Weak = 2 debuffs
+    # Target has Poison=1 and Weak=1 = 2 debuffs
     hp_before = cs.get_monsters()[0].hp
     hi = setup_card(cs, sts_sim.Card.Choke)
     cs.play_card(hi, 0)
-    # Base 3 + (1 * 2 debuffs) = 5
-    assert hp_before - cs.get_monsters()[0].hp == 5
+    # base_damage(3) * (1 + 1 poison + 1 weak) = 9
+    assert hp_before - cs.get_monsters()[0].hp == 9
 
 
 def test_predator_attacks_and_draws():
@@ -486,14 +485,15 @@ def test_escape_plan_block_and_draw():
 
 
 def test_expertise_draws_cards():
-    """Expertise draws cards equal to magic number."""
+    """Expertise draws up to magic - hand_size cards."""
     cs = make_combat()
     cs.start_combat()
     hi = setup_card(cs, sts_sim.Card.Expertise)
     hand_before = len(cs.get_hand())
     cs.play_card(hi, None)
-    # Draws 6, played 1: net +5
-    assert len(cs.get_hand()) == hand_before - 1 + 6
+    # BG mod: draws max(0, base_magic - hand_size) cards
+    # hand_before=6, play 1 so hand=5, base_magic=6, draw max(0,6-5)=1
+    assert len(cs.get_hand()) == 6  # 5 remaining + 1 drawn
 
 
 def test_concentrate_discards_hand_and_draws():
@@ -543,7 +543,7 @@ def test_setup_gives_energy():
 
 
 def test_adrenaline_gives_energy_and_draws():
-    """Adrenaline gives 1 energy and draws 2."""
+    """Adrenaline (base) gives 1 energy and draws 2."""
     cs = make_combat()
     cs.start_combat()
     cs.set_player_energy(3)
@@ -565,12 +565,12 @@ def test_adrenaline_upgraded_gives_2_energy():
 
 
 def test_outmaneuver_gives_energy():
-    """Outmaneuver: BG mod only gives energy if retained from last turn (no-op here)."""
+    """Outmaneuver: costs 0 energy, BG mod gives energy when retained."""
     cs = make_combat()
     cs.start_combat()
     hi = setup_card(cs, sts_sim.Card.Outmaneuver, energy=3)
     cs.play_card(hi, None)
-    # BG mod: energy gain only when retained; cost 0 so energy unchanged
+    # BG mod: costs 0, energy gain only when retained
     assert cs.player.energy == 3
 
 

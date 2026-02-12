@@ -797,6 +797,7 @@ def make_sim(*, hand=None, draw_pile=None, discard_pile=None,
         monster_list, seed=0, character=sts_sim.Character.Ironclad,
     )
     sim.set_player_energy(energy)
+    sim.set_player_max_hp(9)  # Match live game max_hp default
     sim.set_player_hp(player_hp)
     sim.set_player_block(player_block)
 

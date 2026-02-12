@@ -173,14 +173,14 @@ def test_sneaky_strike_with_discard():
 
 
 def test_sneaky_strike_upgraded():
-    """Upgraded Sneaky Strike deals 4 HIT."""
+    """Upgraded Sneaky Strike deals 4 base + 1 STR = 5 damage."""
     sim = make_sim(
         hand=[(sts_sim.Card.SneakyStrike, True)], energy=3, monster_hp=20,
         player_powers={"Strength": 1},
     )
     sim.play_card(0, 0)
-    # 4 HIT, each dealing 1+1 STR = 2 damage each = 8 total
-    assert sim.get_monsters()[0].hp == 12
+    # Single-hit: 4 base + 1 STR = 5 damage
+    assert sim.get_monsters()[0].hp == 15
     assert sim.player.energy == 1  # costs 2
 
 
@@ -197,24 +197,25 @@ def test_slice_base_no_shiv():
 
 
 def test_slice_with_shiv():
-    """Slice deals bonus damage with SHIV."""
+    """Slice deals bonus damage when a shiv was used this turn."""
     sim = make_sim(
         hand=[sts_sim.Card.Slice], energy=3, monster_hp=10,
         player_powers={"Shiv": 1},
     )
-    sim.play_card(0, 0)
-    assert sim.get_monsters()[0].hp == 8  # 1 HIT + 1 SHIV bonus = 2
+    sim.use_shiv(0)  # 1 damage, hp=9, shivs_played=1
+    sim.play_card(0, 0)  # 1 base + 1 shiv bonus = 2 damage, hp=7
+    assert sim.get_monsters()[0].hp == 7
 
 
 def test_slice_upgraded_with_shiv():
-    """Upgraded Slice with SHIV and STR adds bonus to total."""
+    """Upgraded Slice+ with shiv used and STR."""
     sim = make_sim(
         hand=[(sts_sim.Card.Slice, True)], energy=3, monster_hp=10,
         player_powers={"Shiv": 1, "Strength": 1},
     )
-    sim.play_card(0, 0)
-    # 2 HIT at 2 damage each (1+1 STR) = 4, plus 1 SHIV bonus = 5
-    assert sim.get_monsters()[0].hp == 5
+    sim.use_shiv(0)  # (1 + 1 STR) = 2 damage, hp=8
+    sim.play_card(0, 0)  # (2 base + 1 shiv bonus + 1 STR) = 4 damage, hp=4
+    assert sim.get_monsters()[0].hp == 4
 
 
 # ---------------------------------------------------------------------------
@@ -349,16 +350,16 @@ def test_cloak_and_dagger_upgraded():
 
 
 def test_cloak_and_dagger_shiv_with_accuracy():
-    """Cloak and Dagger SHIV interacts with Accuracy."""
+    """Cloak and Dagger SHIV interacts with Accuracy when used."""
     sim = make_sim(
         hand=[sts_sim.Card.CloakAndDagger, sts_sim.Card.Slice],
         energy=3, player_block=0, monster_hp=10,
         player_powers={"Accuracy": 1},
     )
     sim.play_card(0, None)  # Play Cloak and Dagger -> 1 SHIV, 1 block
-    sim.play_card(0, 0)  # Play Slice targeting enemy
-    # Slice: 1 HIT + 1 SHIV bonus + 1 Accuracy bonus = 3 damage
-    assert sim.get_monsters()[0].hp == 7
+    sim.use_shiv(0)  # (1 + 1 Accuracy) = 2 damage, hp=8
+    sim.play_card(0, 0)  # Slice: 1 base + 1 shiv bonus = 2 damage, hp=6
+    assert sim.get_monsters()[0].hp == 6
 
 
 # ---------------------------------------------------------------------------
@@ -540,31 +541,31 @@ def test_acrobatics_discard_triggers_after_image():
 # ---------------------------------------------------------------------------
 
 def test_accuracy_boosts_shiv():
-    """Accuracy boosts SHIV bonus damage on Slice."""
+    """Accuracy boosts shiv use damage."""
     sim = make_sim(
         hand=[sts_sim.Card.AccuracyCard, sts_sim.Card.Slice],
         energy=3, monster_hp=10,
         player_powers={"Shiv": 1},
     )
-    sim.play_card(0, None)  # Play Accuracy
-    sim.play_card(0, 0)  # Play Slice
-    # Slice: 1 HIT + 1 SHIV bonus + 1 Accuracy bonus = 3 damage
-    assert sim.get_monsters()[0].hp == 7
+    sim.play_card(0, None)  # Play Accuracy -> Accuracy:1
+    sim.use_shiv(0)  # (1 + 1 Accuracy) = 2 damage, hp=8
+    sim.play_card(0, 0)  # Slice: 1 base + 1 shiv bonus = 2 damage, hp=6
+    assert sim.get_monsters()[0].hp == 6
 
 
 def test_accuracy_stacks():
-    """Accuracy stacks with multiple plays."""
+    """Accuracy stacks with multiple plays, boosting shiv damage."""
     sim = make_sim(
         hand=[sts_sim.Card.AccuracyCard, sts_sim.Card.AccuracyCard,
               sts_sim.Card.Slice],
         energy=3, monster_hp=10,
         player_powers={"Shiv": 1},
     )
-    sim.play_card(0, None)  # Play first Accuracy
-    sim.play_card(0, None)  # Play second Accuracy
-    sim.play_card(0, 0)  # Play Slice
-    # Slice: 1 HIT + 1 SHIV bonus + 2 Accuracy bonus = 4 damage
-    assert sim.get_monsters()[0].hp == 6
+    sim.play_card(0, None)  # Play first Accuracy -> Accuracy:1
+    sim.play_card(0, None)  # Play second Accuracy -> Accuracy:2
+    sim.use_shiv(0)  # (1 + 2 Accuracy) = 3 damage, hp=7
+    sim.play_card(0, 0)  # Slice: 1 base + 1 shiv bonus = 2 damage, hp=5
+    assert sim.get_monsters()[0].hp == 5
 
 
 def test_accuracy_upgraded_costs_zero():

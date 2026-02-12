@@ -569,7 +569,8 @@ impl CardInstance {
             (Card::Setup, _) => 0,
             (Card::Terror, _) => 1,
             // Silent Uncommon Powers
-            (Card::FootworkCard, _) => 2,
+            (Card::FootworkCard, false) => 3,
+            (Card::FootworkCard, true) => 2,
             (Card::NoxiousFumesCard, _) => 1,
             (Card::WellLaidPlansCard, _) => 1,
             (Card::DistractionCard, false) => 2,
@@ -1042,8 +1043,8 @@ impl CardInstance {
             (Card::Bane, _) => 2,  // bonus if poisoned
             (Card::Choke, _) => 1,  // bonus per debuff
             (Card::Predator, _) => 2,  // draw count
-            (Card::MasterfulStab, false) => 2,  // cost increase
-            (Card::MasterfulStab, true) => 1,
+            (Card::MasterfulStab, false) => 3,  // cost when damaged
+            (Card::MasterfulStab, true) => 2,
             (Card::Finisher, _) => 0,  // per attack played
             (Card::Flechettes, false) => 0,  // bonus per skill in hand
             (Card::Flechettes, true) => 1,

@@ -367,6 +367,65 @@ RELIC_TO_BG = {
 
 
 # ---------------------------------------------------------------------------
+# Monster info: monster_id -> (name, behavior, die_controlled)
+# Used by make_sim() to create the correct Monster type.
+# ---------------------------------------------------------------------------
+_MONSTER_INFO = {
+    "jaw_worm": ("Jaw Worm", "A", False),
+    "gremlin_nob": ("Gremlin Nob", "BS", False),
+}
+
+
+# ---------------------------------------------------------------------------
+# Power ID mapping: CommunicationMod power IDs -> sim PowerType names
+# Used by assert_powers_match() to compare live vs sim powers.
+# ---------------------------------------------------------------------------
+_POWER_ID_MAP = {
+    "Strength": "Strength",
+    "Dexterity": "Dexterity",
+    "Vulnerable": "Vulnerable",
+    "Weak": "Weak",
+    "Poison": "Poison",
+    "Ritual": "Ritual",
+    "Curl Up": "CurlUp",
+    "Thorns": "Thorns",
+    "Metallicize": "Metallicize",
+    "Barricade": "Barricade",
+    "Rage": "Rage",
+    "Feel No Pain": "FeelNoPain",
+    "Dark Embrace": "DarkEmbrace",
+    "Rupture": "Rupture",
+    "Combust": "Combust",
+    "Evolve": "Evolve",
+    "Fire Breathing": "FireBreathing",
+    "Anger": "Anger",
+    "Entangled": "Entangled",
+    "Artifact": "Artifact",
+    "Spore Cloud": "SporeCloud",
+    "Juggernaut": "Juggernaut",
+    "Demon Form": "DemonForm",
+    "Corruption": "Corruption",
+    "Double Tap": "DoubleTap",
+    "No Draw": "NoDraw",
+    "Noxious Fumes": "NoxiousFumes",
+    "NoxiousFumes": "NoxiousFumes",
+    "After Image": "AfterImage",
+    "A Thousand Cuts": "AThousandCuts",
+    "Accuracy": "Accuracy",
+    "Envenom": "Envenom",
+    "Infinite Blades": "InfiniteBlades",
+    "Tools of the Trade": "ToolsOfTheTrade",
+    "Well-Laid Plans": "WellLaidPlans",
+    "Burst": "Burst",
+    "Wraith Form": "WraithForm",
+    "Corpse Explosion": "CorpseExplosion",
+}
+
+# Internal BG mod powers to skip when comparing (die-related noise)
+_SKIP_POWERS = {"BGTheDiePower", "BGTriggerAnyDieAbilityPower"}
+
+
+# ---------------------------------------------------------------------------
 # Session fixtures
 # ---------------------------------------------------------------------------
 
@@ -656,7 +715,29 @@ def _wait_for_play_resolution(client, choices=None):
     return state
 
 
+def _swap_encounter(client, encounter_name):
+    """Swap the current encounter and wait for the new combat to be ready.
+
+    Sends a set_state with the encounter name, then polls until
+    BGTheDiePower appears (meaning TheDie.roll() has fired and the
+    turn is fully initialized).
+    """
+    _drain(client)
+    client.set_state({"encounter": encounter_name, "die": 1})
+    for _ in range(50):
+        state = client.wait_for_state(timeout=10.0)
+        if client.ready_for_command and state and state.combat_state:
+            has_die_power = any(
+                p.power_id == "BGTheDiePower"
+                for p in state.combat_state.player.powers
+            )
+            if has_die_power:
+                break
+        time.sleep(0.1)
+
+
 def set_scenario(client, *,
+                 encounter=None,
                  hand=None,
                  draw_pile=None,
                  discard_pile=None,
@@ -672,9 +753,8 @@ def set_scenario(client, *,
                  monsters=None):
     """Configure exact game state via the set command.
 
-    Modifies existing monsters in-place (no encounter replacement, as the
-    BG mod reverts encounter changes on the next action). Sets player stats,
-    hand, draw/discard piles, and monster[0] stats.
+    Sets player stats, hand, draw/discard piles, and monster stats.
+    Use ``encounter`` to swap the monster group (e.g. "GremlinNob").
 
     Use ``monsters`` (list of dicts with hp/block/powers keys) to configure
     multiple monsters.  When omitted the single-monster ``monster_hp`` /
@@ -733,6 +813,12 @@ def set_scenario(client, *,
         # Default: keep BurningBlood (Ironclad starter)
         bg_relics.append(RELIC_TO_BG[sts_sim.Relic.BurningBlood])
 
+    # Step 1: If encounter swap requested, start room transition first
+    # and wait for the new combat to be ready before setting state.
+    if encounter is not None:
+        _swap_encounter(client, encounter)
+
+    # Step 2: Apply the rest of the state (die, relics, monsters, player)
     payload = {
         "clear_turn": True,  # Reset cardsPlayedThisTurn to prevent accumulated state
         "relics": bg_relics,
@@ -758,12 +844,15 @@ def make_sim(*, hand=None, draw_pile=None, discard_pile=None,
              energy=3, player_hp=9, player_block=0,
              player_powers=None, player_relics=None, orbs=None,
              monster_hp=8, monster_block=0, monster_powers=None,
-             monsters=None):
+             monsters=None, monster_id="jaw_worm"):
     """Create a simulator CombatState matching the game scenario.
 
     Use ``monsters`` (list of dicts with hp/block/powers keys) to configure
     multiple monsters.  When omitted the single-monster ``monster_hp`` /
     ``monster_block`` / ``monster_powers`` params are used.
+
+    Use ``monster_id`` to specify the monster type (default "jaw_worm").
+    For multi-turn tests, use "gremlin_nob" for predictable behavior.
 
     Returns the CombatState ready for play_card().
     """
@@ -771,10 +860,15 @@ def make_sim(*, hand=None, draw_pile=None, discard_pile=None,
     draw_pile = draw_pile or []
     discard_pile = discard_pile or []
 
+    m_name, m_behavior, m_die_ctrl = _MONSTER_INFO.get(
+        monster_id, (monster_id, "A", False))
+
     if monsters is not None:
         monster_list = []
         for i, m in enumerate(monsters):
-            mon = sts_sim.Monster(f"Monster_{i}", m.get("hp", 30), "jaw_worm", "A", False)
+            mid = m.get("monster_id", monster_id)
+            mn, mb, mdc = _MONSTER_INFO.get(mid, (mid, "A", False))
+            mon = sts_sim.Monster(mn, m.get("hp", 30), mid, mb, mdc)
             blk = m.get("block", 0)
             if blk > 0:
                 mon.add_block(blk)
@@ -784,7 +878,7 @@ def make_sim(*, hand=None, draw_pile=None, discard_pile=None,
                     mon.apply_power(pt, amount)
             monster_list.append(mon)
     else:
-        monster = sts_sim.Monster("Jaw Worm", monster_hp, "jaw_worm", "A", False)
+        monster = sts_sim.Monster(m_name, monster_hp, monster_id, m_behavior, m_die_ctrl)
         if monster_block > 0:
             monster.add_block(monster_block)
         if monster_powers:
@@ -898,39 +992,147 @@ def play_named_card(client, sim, setup_state, card, target_index=None,
     return game_state
 
 
+def end_turn_both(client, sim, die_value=1):
+    """End turn in both live game and simulator, advance to next player turn.
+
+    Simulator side:
+      - end_player_turn() processes end-of-turn effects
+      - roll_and_execute_monsters() executes monster turns,
+        then auto-calls start_player_turn()
+
+    Live game side:
+      - Sends "end" and waits for ready_for_command=True.
+      - Because set_scenario sets TheDie.forcedRoll and
+        BGTheDieRelic.autoLockIn, the new turn's die roll is
+        deterministic (value 1) and auto-locks immediately,
+        firing all start-of-turn effects before the state is sent.
+
+    Returns the GameState from the live game after the turn completes.
+    """
+    # Simulator side
+    sim.set_die_value(die_value)
+    sim.end_player_turn()
+    sim.roll_and_execute_monsters()
+
+    # Live game side — send "end" and wait for the turn to fully
+    # complete.  With autoLockIn + forcedRoll, all start-of-turn
+    # effects fire before CommunicationMod sends the state.
+    #
+    # Some start-of-turn powers (e.g. BGNoxiousFumesPower) open
+    # intermediate screens (TARGET_SELECT) that CommunicationMod
+    # waits on.  We auto-handle these just like _wait_for_play_resolution.
+    client.end_turn()
+    state = None
+    for _ in range(60):
+        try:
+            state = client.wait_for_state(timeout=10.0)
+        except (TimeoutError, OSError):
+            break
+        if not (client.ready_for_command and state and state.combat_state):
+            time.sleep(0.1)
+            continue
+        # Check for intermediate choice screens (e.g. TARGET_SELECT)
+        cmds = client.last_raw.get("available_commands", [])
+        if "choose" in cmds and "play" not in cmds and "end" not in cmds:
+            client.choose(0)
+            continue
+        # Normal combat ready
+        break
+
+    return state
+
+
 def assert_monsters_match(game_state, sim):
-    """Assert that monster[0] HP and block match between game and simulator."""
+    """Assert that all monster HP and block match between game and simulator."""
     live_monsters = [m for m in game_state.combat_state.monsters if not m.is_gone]
     sim_monsters = sim.get_monsters()
 
     assert len(live_monsters) >= 1, "No live monsters in game"
     assert len(sim_monsters) >= 1, "No monsters in simulator"
+    assert len(live_monsters) == len(sim_monsters), (
+        f"Monster count mismatch: live={len(live_monsters)}, sim={len(sim_monsters)}"
+    )
 
-    # Compare only monster[0] — the one we configured via set_scenario
-    lm = live_monsters[0]
-    sm = sim_monsters[0]
-    assert lm.current_hp == sm.hp, (
-        f"Monster[0] HP mismatch: live={lm.current_hp}, sim={sm.hp}"
-    )
-    assert lm.block == sm.block, (
-        f"Monster[0] block mismatch: live={lm.block}, sim={sm.block}"
-    )
+    for i, (lm, sm) in enumerate(zip(live_monsters, sim_monsters)):
+        assert lm.current_hp == sm.hp, (
+            f"Monster[{i}] HP mismatch: live={lm.current_hp}, sim={sm.hp}"
+        )
+        assert lm.block == sm.block, (
+            f"Monster[{i}] block mismatch: live={lm.block}, sim={sm.block}"
+        )
+
+
+def _die_block(game_state):
+    """Return the block granted by the BG die relic (0 or 1).
+
+    The BG mod die rolls 1-6 each turn.  Rolls 4-5 grant 1 block via
+    checkDieAbility().  The sim doesn't model this, so we subtract it
+    from the live block when comparing.
+    """
+    for p in game_state.combat_state.player.powers:
+        if p.power_id == "BGTheDiePower" and p.amount in (4, 5):
+            return 1
+    return 0
 
 
 def assert_player_matches(game_state, sim):
-    """Assert that player HP, block, and energy match."""
+    """Assert that player HP, block, and energy match.
+
+    Block is adjusted for die-relic noise (rolls 4-5 grant 1 block in
+    the BG mod, which the sim intentionally doesn't model).
+    """
     lp = game_state.combat_state.player
     sp = sim.player
 
     assert lp.current_hp == sp.hp, (
         f"Player HP mismatch: live={lp.current_hp}, sim={sp.hp}"
     )
-    assert lp.block == sp.block, (
-        f"Player block mismatch: live={lp.block}, sim={sp.block}"
+    live_block = lp.block - _die_block(game_state)
+    assert live_block == sp.block, (
+        f"Player block mismatch: live={lp.block} (adjusted={live_block}), sim={sp.block}"
     )
     assert lp.energy == sp.energy, (
         f"Player energy mismatch: live={lp.energy}, sim={sp.energy}"
     )
+
+
+def assert_powers_match(game_state, sim, target="player"):
+    """Assert powers match between live game and simulator.
+
+    ``target`` can be "player", "monster" (alias for monster 0), or a
+    monster index (0, 1, ...).
+    """
+    if target == "player":
+        live_powers = game_state.combat_state.player.powers
+        sim_powers = sim.player.get_powers_dict()
+        label = "player"
+    else:
+        idx = 0 if target == "monster" else int(target)
+        live_monsters = [m for m in game_state.combat_state.monsters
+                         if not m.is_gone]
+        sim_monsters = sim.get_monsters()
+        live_powers = live_monsters[idx].powers
+        sim_powers = sim_monsters[idx].get_powers_dict()
+        label = f"monster[{idx}]"
+
+    # Check all live powers exist in sim with matching amounts
+    live_mapped = {}
+    for lp in live_powers:
+        if lp.power_id in _SKIP_POWERS:
+            continue
+        power_name = _POWER_ID_MAP.get(lp.power_id, lp.power_id)
+        live_mapped[power_name] = lp.amount
+        sim_amount = sim_powers.get(power_name, 0)
+        assert lp.amount == sim_amount, (
+            f"{label} power {lp.power_id} mismatch: live={lp.amount}, sim={sim_amount}"
+        )
+
+    # Check sim doesn't have extra powers that live is missing
+    for sp_name, sp_amount in sim_powers.items():
+        if sp_amount != 0 and sp_name not in live_mapped:
+            assert False, (
+                f"{label} sim has power {sp_name}={sp_amount} not found in live"
+            )
 
 
 def assert_relics_match(game_state, sim):

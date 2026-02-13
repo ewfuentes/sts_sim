@@ -13,215 +13,187 @@ from tests.live.conftest import (
 )
 
 
-# ── Ascender's Bane [Y] ─────────────────────────────────────────────────
+@pytest.mark.usefixtures("single_monster_fight")
+class TestCards:
 
+    # ── Ascender's Bane [Y] ─────────────────────────────────────────────────
 
-def test_ascenders_bane_in_hand(game):
-    """AscendersBane is unplayable — verify it stays in hand while other cards play.
+    def test_ascenders_bane_in_hand(self, game):
+        """AscendersBane is unplayable — verify it stays in hand while other cards play.
 
-    Setup: AscendersBane + Strike in hand, monster at 30 HP.
-    Play Strike, verify AscendersBane remains.
-    """
-    hand = [sts_sim.Card.StrikeRed, sts_sim.Card.AscendersBane]
+        Setup: AscendersBane + Strike in hand, monster at 30 HP.
+        Play Strike, verify AscendersBane remains.
+        """
+        hand = [sts_sim.Card.StrikeRed, sts_sim.Card.AscendersBane]
 
-    setup = set_scenario(game, hand=hand, energy=3, monster_hp=30)
-    sim = make_sim(hand=hand, energy=3, monster_hp=30)
+        setup = set_scenario(game, hand=hand, energy=3, monster_hp=30)
+        sim = make_sim(hand=hand, energy=3, monster_hp=30)
 
-    state = play_named_card(game, sim, setup, sts_sim.Card.StrikeRed,
-                            target_index=0)
+        state = play_named_card(game, sim, setup, sts_sim.Card.StrikeRed,
+                                target_index=0)
 
-    assert_monsters_match(state, sim)
-    assert_player_matches(state, sim)
-    assert_hand_matches(state, sim)
+        assert_monsters_match(state, sim)
+        assert_player_matches(state, sim)
+        assert_hand_matches(state, sim)
 
+    # ── Decay [Y] ────────────────────────────────────────────────────────────
 
-# ── Decay [Y] ────────────────────────────────────────────────────────────
+    def test_decay_in_hand(self, game):
+        """Decay is unplayable — verify it stays in hand while other cards play.
 
+        Setup: Decay + Strike in hand, monster at 30 HP.
+        Play Strike, verify Decay remains.
+        """
+        hand = [sts_sim.Card.StrikeRed, sts_sim.Card.Decay]
 
-def test_decay_in_hand(game):
-    """Decay is unplayable — verify it stays in hand while other cards play.
+        setup = set_scenario(game, hand=hand, energy=3, monster_hp=30)
+        sim = make_sim(hand=hand, energy=3, monster_hp=30)
 
-    Setup: Decay + Strike in hand, monster at 30 HP.
-    Play Strike, verify Decay remains.
-    """
-    hand = [sts_sim.Card.StrikeRed, sts_sim.Card.Decay]
+        state = play_named_card(game, sim, setup, sts_sim.Card.StrikeRed,
+                                target_index=0)
 
-    setup = set_scenario(game, hand=hand, energy=3, monster_hp=30)
-    sim = make_sim(hand=hand, energy=3, monster_hp=30)
+        assert_monsters_match(state, sim)
+        assert_player_matches(state, sim)
+        assert_hand_matches(state, sim)
 
-    state = play_named_card(game, sim, setup, sts_sim.Card.StrikeRed,
-                            target_index=0)
+    # ── Injury [Y] ───────────────────────────────────────────────────────────
 
-    assert_monsters_match(state, sim)
-    assert_player_matches(state, sim)
-    assert_hand_matches(state, sim)
+    def test_injury_in_hand(self, game):
+        """Injury is unplayable — verify it stays in hand while other cards play.
 
+        Setup: Injury + Strike in hand, monster at 30 HP.
+        Play Strike, verify Injury remains.
+        """
+        hand = [sts_sim.Card.StrikeRed, sts_sim.Card.Injury]
 
-# ── Injury [Y] ───────────────────────────────────────────────────────────
+        setup = set_scenario(game, hand=hand, energy=3, monster_hp=30)
+        sim = make_sim(hand=hand, energy=3, monster_hp=30)
 
+        state = play_named_card(game, sim, setup, sts_sim.Card.StrikeRed,
+                                target_index=0)
 
-def test_injury_in_hand(game):
-    """Injury is unplayable — verify it stays in hand while other cards play.
+        assert_monsters_match(state, sim)
+        assert_player_matches(state, sim)
+        assert_hand_matches(state, sim)
 
-    Setup: Injury + Strike in hand, monster at 30 HP.
-    Play Strike, verify Injury remains.
-    """
-    hand = [sts_sim.Card.StrikeRed, sts_sim.Card.Injury]
+    # ── Pain [Y] ─────────────────────────────────────────────────────────────
 
-    setup = set_scenario(game, hand=hand, energy=3, monster_hp=30)
-    sim = make_sim(hand=hand, energy=3, monster_hp=30)
+    def test_pain_in_hand(self, game):
+        """Pain is unplayable — verify it stays in hand while other cards play.
 
-    state = play_named_card(game, sim, setup, sts_sim.Card.StrikeRed,
-                            target_index=0)
+        Setup: Pain + Strike in hand, monster at 30 HP.
+        Play Strike, verify Pain remains.
+        """
+        hand = [sts_sim.Card.StrikeRed, sts_sim.Card.Pain]
 
-    assert_monsters_match(state, sim)
-    assert_player_matches(state, sim)
-    assert_hand_matches(state, sim)
+        setup = set_scenario(game, hand=hand, energy=3, monster_hp=30)
+        sim = make_sim(hand=hand, energy=3, monster_hp=30)
 
+        state = play_named_card(game, sim, setup, sts_sim.Card.StrikeRed,
+                                target_index=0)
 
-# ── Pain [Y] ─────────────────────────────────────────────────────────────
+        assert_monsters_match(state, sim)
+        assert_player_matches(state, sim)
+        assert_hand_matches(state, sim)
 
+    # ── Clumsy [N] ───────────────────────────────────────────────────────────
 
-def test_pain_in_hand(game):
-    """Pain is unplayable — verify it stays in hand while other cards play.
+    @pytest.mark.skip(reason="Clumsy not implemented in simulator")
+    def test_clumsy_unplayable(self, game):
+        """Clumsy cannot be played."""
+        pass
 
-    Setup: Pain + Strike in hand, monster at 30 HP.
-    Play Strike, verify Pain remains.
-    """
-    hand = [sts_sim.Card.StrikeRed, sts_sim.Card.Pain]
+    @pytest.mark.skip(reason="Clumsy not implemented in simulator")
+    def test_clumsy_ethereal(self, game):
+        """Clumsy exhausts at end of turn (Ethereal)."""
+        pass
 
-    setup = set_scenario(game, hand=hand, energy=3, monster_hp=30)
-    sim = make_sim(hand=hand, energy=3, monster_hp=30)
+    @pytest.mark.skip(reason="Clumsy not implemented in simulator")
+    def test_clumsy_clogs_hand(self, game):
+        """Clumsy takes up a hand slot when drawn."""
+        pass
 
-    state = play_named_card(game, sim, setup, sts_sim.Card.StrikeRed,
-                            target_index=0)
-
-    assert_monsters_match(state, sim)
-    assert_player_matches(state, sim)
-    assert_hand_matches(state, sim)
-
-
-# ── Clumsy [N] ───────────────────────────────────────────────────────────
-
-
-@pytest.mark.skip(reason="Clumsy not implemented in simulator")
-def test_clumsy_unplayable(game):
-    """Clumsy cannot be played."""
-    pass
-
-
-@pytest.mark.skip(reason="Clumsy not implemented in simulator")
-def test_clumsy_ethereal(game):
-    """Clumsy exhausts at end of turn (Ethereal)."""
-    pass
-
-
-@pytest.mark.skip(reason="Clumsy not implemented in simulator")
-def test_clumsy_clogs_hand(game):
-    """Clumsy takes up a hand slot when drawn."""
-    pass
-
-
-# ── Doubt [N] ────────────────────────────────────────────────────────────
-
-
-@pytest.mark.skip(reason="Doubt not implemented in simulator")
-def test_doubt_unplayable(game):
-    """Doubt cannot be played."""
-    pass
-
-
-@pytest.mark.skip(reason="Doubt not implemented in simulator")
-def test_doubt_end_of_turn_weak(game):
-    """Doubt applies WEAK at end of turn."""
-    pass
-
-
-@pytest.mark.skip(reason="Doubt not implemented in simulator")
-def test_doubt_stacking_weak(game):
-    """Doubt stacks WEAK with existing WEAK tokens."""
-    pass
-
-
-# ── Parasite [N] ─────────────────────────────────────────────────────────
-
-
-@pytest.mark.skip(reason="Parasite not implemented in simulator")
-def test_parasite_unplayable(game):
-    """Parasite cannot be played."""
-    pass
-
-
-@pytest.mark.skip(reason="Parasite not implemented in simulator")
-def test_parasite_removal_hp_loss(game):
-    """Removing Parasite from deck causes 2 HP loss."""
-    pass
-
-
-@pytest.mark.skip(reason="Parasite not implemented in simulator")
-def test_parasite_no_passive_effect(game):
-    """Parasite has no passive effect during combat."""
-    pass
-
-
-# ── Regret [N] ───────────────────────────────────────────────────────────
-
-
-@pytest.mark.skip(reason="Regret not implemented in simulator")
-def test_regret_unplayable(game):
-    """Regret cannot be played."""
-    pass
-
-
-@pytest.mark.skip(reason="Regret not implemented in simulator")
-def test_regret_retain(game):
-    """Regret retains in hand every turn."""
-    pass
-
-
-@pytest.mark.skip(reason="Regret not implemented in simulator")
-def test_regret_permanent_clog(game):
-    """Regret permanently clogs one hand slot."""
-    pass
-
-
-# ── Shame [N] ────────────────────────────────────────────────────────────
-
-
-@pytest.mark.skip(reason="Shame not implemented in simulator")
-def test_shame_unplayable(game):
-    """Shame cannot be played."""
-    pass
-
-
-@pytest.mark.skip(reason="Shame not implemented in simulator")
-def test_shame_end_of_turn_block_loss(game):
-    """Shame causes 1 block loss at end of turn."""
-    pass
-
-
-@pytest.mark.skip(reason="Shame not implemented in simulator")
-def test_shame_no_negative_block(game):
-    """Shame does not cause block to go negative."""
-    pass
-
-
-# ── Writhe [N] ───────────────────────────────────────────────────────────
-
-
-@pytest.mark.skip(reason="Writhe not implemented in simulator")
-def test_writhe_play_exhaust(game):
-    """Writhe exhausts when played for 1 energy."""
-    pass
-
-
-@pytest.mark.skip(reason="Writhe not implemented in simulator")
-def test_writhe_not_enough_energy(game):
-    """Writhe cannot be played without enough energy."""
-    pass
-
-
-@pytest.mark.skip(reason="Writhe not implemented in simulator")
-def test_writhe_discarded_if_not_played(game):
-    """Writhe is discarded if not played, returns to draw pile."""
-    pass
+    # ── Doubt [N] ────────────────────────────────────────────────────────────
+
+    @pytest.mark.skip(reason="Doubt not implemented in simulator")
+    def test_doubt_unplayable(self, game):
+        """Doubt cannot be played."""
+        pass
+
+    @pytest.mark.skip(reason="Doubt not implemented in simulator")
+    def test_doubt_end_of_turn_weak(self, game):
+        """Doubt applies WEAK at end of turn."""
+        pass
+
+    @pytest.mark.skip(reason="Doubt not implemented in simulator")
+    def test_doubt_stacking_weak(self, game):
+        """Doubt stacks WEAK with existing WEAK tokens."""
+        pass
+
+    # ── Parasite [N] ─────────────────────────────────────────────────────────
+
+    @pytest.mark.skip(reason="Parasite not implemented in simulator")
+    def test_parasite_unplayable(self, game):
+        """Parasite cannot be played."""
+        pass
+
+    @pytest.mark.skip(reason="Parasite not implemented in simulator")
+    def test_parasite_removal_hp_loss(self, game):
+        """Removing Parasite from deck causes 2 HP loss."""
+        pass
+
+    @pytest.mark.skip(reason="Parasite not implemented in simulator")
+    def test_parasite_no_passive_effect(self, game):
+        """Parasite has no passive effect during combat."""
+        pass
+
+    # ── Regret [N] ───────────────────────────────────────────────────────────
+
+    @pytest.mark.skip(reason="Regret not implemented in simulator")
+    def test_regret_unplayable(self, game):
+        """Regret cannot be played."""
+        pass
+
+    @pytest.mark.skip(reason="Regret not implemented in simulator")
+    def test_regret_retain(self, game):
+        """Regret retains in hand every turn."""
+        pass
+
+    @pytest.mark.skip(reason="Regret not implemented in simulator")
+    def test_regret_permanent_clog(self, game):
+        """Regret permanently clogs one hand slot."""
+        pass
+
+    # ── Shame [N] ────────────────────────────────────────────────────────────
+
+    @pytest.mark.skip(reason="Shame not implemented in simulator")
+    def test_shame_unplayable(self, game):
+        """Shame cannot be played."""
+        pass
+
+    @pytest.mark.skip(reason="Shame not implemented in simulator")
+    def test_shame_end_of_turn_block_loss(self, game):
+        """Shame causes 1 block loss at end of turn."""
+        pass
+
+    @pytest.mark.skip(reason="Shame not implemented in simulator")
+    def test_shame_no_negative_block(self, game):
+        """Shame does not cause block to go negative."""
+        pass
+
+    # ── Writhe [N] ───────────────────────────────────────────────────────────
+
+    @pytest.mark.skip(reason="Writhe not implemented in simulator")
+    def test_writhe_play_exhaust(self, game):
+        """Writhe exhausts when played for 1 energy."""
+        pass
+
+    @pytest.mark.skip(reason="Writhe not implemented in simulator")
+    def test_writhe_not_enough_energy(self, game):
+        """Writhe cannot be played without enough energy."""
+        pass
+
+    @pytest.mark.skip(reason="Writhe not implemented in simulator")
+    def test_writhe_discarded_if_not_played(self, game):
+        """Writhe is discarded if not played, returns to draw pile."""
+        pass

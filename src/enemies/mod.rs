@@ -16,6 +16,7 @@ pub mod sentry;
 pub mod the_guardian;
 pub mod hexaghost;
 pub mod slime_boss;
+pub mod dummy;
 
 use crate::cards::Card;
 use crate::creature::{Monster, Player};
@@ -47,6 +48,18 @@ pub fn select_die_move(monster: &mut Monster, roll: u8) {
         "blue_slaver" => blue_slaver::set_move(monster, ch),
         "red_slaver" => red_slaver::set_move(monster, ch),
         "sentry" => sentry::set_move(monster, ch),
+        _ => {}
+    }
+}
+
+/// Select a move for a die-controlled monster with a 6-char behavior string.
+/// Maps die roll 1-6 directly to behavior index 0-5 (one action per face).
+pub fn select_die_move_direct(monster: &mut Monster, roll: u8) {
+    let idx = (roll - 1) as usize;
+    let ch = monster.behavior.chars().nth(idx).unwrap_or(' ');
+
+    match monster.monster_id.as_str() {
+        "dummy" => dummy::set_move(monster, ch),
         _ => {}
     }
 }
@@ -104,6 +117,7 @@ pub fn execute_move(monster: &mut Monster, player: &mut Player) -> MoveResult {
         "the_guardian" => the_guardian::execute_move(monster, player),
         "hexaghost" => hexaghost::execute_move(monster, player),
         "slime_boss" => slime_boss::execute_move(monster, player),
+        "dummy" => dummy::execute_move(monster, player),
         _ => MoveResult::default(),
     }
 }

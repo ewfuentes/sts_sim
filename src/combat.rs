@@ -61,6 +61,40 @@ impl CombatState {
             shivs_played_this_turn: 0,
         }
     }
+
+    /// Create a CombatState with a custom deck, HP, and relics.
+    /// Used by the game state machine to carry persistent player state into combat.
+    pub fn new_with_deck(
+        monsters: Vec<Monster>,
+        seed: Option<u64>,
+        deck: Vec<CardInstance>,
+        hp: i32,
+        max_hp: i32,
+        relics: Vec<crate::enums::Relic>,
+    ) -> Self {
+        let s = seed.unwrap_or(0);
+        let mut player = Player::new(Some(Character::Ironclad));
+        player.hp = hp;
+        player.max_hp = max_hp;
+        player.relics = relics;
+        CombatState {
+            player,
+            monsters,
+            deck,
+            die: TheDie::new(Some(s)),
+            turn_number: 0,
+            combat_over: false,
+            player_won: false,
+            rng: StdRng::seed_from_u64(s.wrapping_add(1)),
+            stance_changed_this_turn: false,
+            cards_played_this_turn: Vec::new(),
+            has_card_been_played_this_turn: false,
+            player_damaged_this_combat: false,
+            discarded_this_turn: false,
+            cards_cost_zero_this_turn: false,
+            shivs_played_this_turn: 0,
+        }
+    }
 }
 
 #[pymethods]
@@ -2166,6 +2200,9 @@ impl CombatState {
                 // Sentries use 2-char behavior (1-3→idx 0, 4-6→idx 1)
                 if self.monsters[i].behavior.len() == 2 {
                     enemies::select_die_move_2char(&mut self.monsters[i], roll);
+                } else if self.monsters[i].behavior.len() == 6 {
+                    // 6-char behavior: one action per die face (1→0, 2→1, ..., 6→5)
+                    enemies::select_die_move_direct(&mut self.monsters[i], roll);
                 } else {
                     enemies::select_die_move(&mut self.monsters[i], roll);
                 }

@@ -15,6 +15,7 @@ mod map;
 mod rewards;
 mod shop;
 mod rest;
+mod state_machine;
 
 #[pymodule]
 fn sts_sim(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -50,5 +51,6 @@ fn sts_sim(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(map::generate_map, m)?)?;
     m.add_function(wrap_pyfunction!(shop::create_shop, m)?)?;
     m.add_function(wrap_pyfunction!(rest::create_rest_site, m)?)?;
+    m.add_class::<state_machine::GameState>()?;
     Ok(())
 }

@@ -4,10 +4,42 @@ use crate::cards::{Card, CardInstance};
 use crate::combat::CombatState;
 use crate::creature::Monster;
 use crate::enemies;
-use crate::enums::{EventType, Relic, RoomType};
+use crate::enums::{CardType, EventType, PowerType, Relic, RoomType};
 use crate::events::EventState;
 use crate::rest::RestSite;
 use crate::shop::ShopState;
+
+// ---- Action enum ----
+
+#[pyclass]
+#[derive(Clone, Debug)]
+pub enum Action {
+    /// Choose a room from the map to enter.
+    ChooseRoom { index: usize },
+    /// Play a card from hand, optionally targeting a monster.
+    PlayCard {
+        hand_index: usize,
+        target: Option<usize>,
+    },
+    /// End the player's turn in combat.
+    EndTurn {},
+    /// Pick a card reward by index.
+    PickCard { index: usize },
+    /// Skip the card reward.
+    SkipCard {},
+    /// Choose an event option by index.
+    EventChoose { index: usize },
+    /// Buy an item from the shop by index.
+    ShopBuy { index: usize },
+    /// Leave the shop.
+    ShopLeave {},
+    /// Choose a card to remove from the deck (during shop removal).
+    ShopRemoveCard { card_index: usize },
+    /// Choose a rest site action by index (0=rest, 1=smith).
+    RestChoose { index: usize },
+    /// Choose a card to upgrade at the smithy.
+    RestUpgradeCard { card_index: usize },
+}
 
 /// The linear map of rooms for a mini-run.
 fn default_rooms() -> Vec<RoomType> {
@@ -58,8 +90,22 @@ pub enum RestPhase {
 
 // ---- Game phase ----
 
+/// Describes a room the player can move to from the map.
+#[pyclass]
+#[derive(Clone, Debug)]
+pub struct MapRoom {
+    #[pyo3(get)]
+    pub index: usize,
+    #[pyo3(get)]
+    pub room_type: RoomType,
+}
+
 pub enum GamePhase {
     NotStarted,
+
+    /// Player is on the map, choosing which room to enter next.
+    MapNavigation,
+
     Combat(CombatState),
     Event(EventState),
     Shop {
@@ -121,9 +167,41 @@ impl GameState {
         }
     }
 
-    /// Start the run. Enters the first room (combat with dummy enemy).
+    /// Start the run. Enters map navigation for the first room.
     pub fn start_run(&mut self) {
         self.current_room = 0;
+        self.phase = GamePhase::MapNavigation;
+    }
+
+    // ---- Map navigation ----
+
+    /// Get the rooms available to move to from the current position.
+    pub fn get_available_rooms(&self) -> Vec<MapRoom> {
+        if !matches!(self.phase, GamePhase::MapNavigation) {
+            return vec![];
+        }
+        // For a linear map, only the current room is available.
+        // With a branching map, this would return multiple options.
+        if self.current_room < self.rooms.len() {
+            vec![MapRoom {
+                index: self.current_room,
+                room_type: self.rooms[self.current_room],
+            }]
+        } else {
+            vec![]
+        }
+    }
+
+    /// Choose a room to enter from the available options.
+    pub fn choose_next_room(&mut self, index: usize) {
+        if !matches!(self.phase, GamePhase::MapNavigation) {
+            return;
+        }
+        let available = self.get_available_rooms();
+        if index >= available.len() {
+            return;
+        }
+        self.current_room = available[index].index;
         self.enter_current_room();
     }
 
@@ -348,6 +426,7 @@ impl GameState {
     pub fn get_phase(&self) -> String {
         match &self.phase {
             GamePhase::NotStarted => "not_started".to_string(),
+            GamePhase::MapNavigation => "map".to_string(),
             GamePhase::Combat(_) => "combat".to_string(),
             GamePhase::Event(_) => "event".to_string(),
             GamePhase::Shop { phase, .. } => match phase {
@@ -460,6 +539,239 @@ impl GameState {
             _ => vec![],
         }
     }
+
+    // ---- Action API ----
+
+    /// Get all valid actions for the current phase.
+    pub fn get_available_actions(&self) -> Vec<Action> {
+        match &self.phase {
+            GamePhase::NotStarted | GamePhase::GameOver { .. } => vec![],
+
+            GamePhase::MapNavigation => {
+                self.get_available_rooms()
+                    .iter()
+                    .enumerate()
+                    .map(|(i, _)| Action::ChooseRoom { index: i })
+                    .collect()
+            }
+
+            GamePhase::Combat(cs) => {
+                let mut actions = Vec::new();
+
+                // Enumerate playable cards
+                let hand = &cs.player.hand_indices;
+                let energy = cs.player.energy;
+                let miracles = cs.player.get_power(PowerType::MiracleCount);
+                let total_energy = energy + miracles;
+                let entangled = cs.player.get_power(PowerType::Entangled) > 0;
+                let corruption = cs.player.get_power(PowerType::Corruption) > 0;
+
+                for (hand_index, &deck_index) in hand.iter().enumerate() {
+                    let card_inst = cs.deck[deck_index];
+
+                    if card_inst.card.unplayable() {
+                        continue;
+                    }
+
+                    let is_attack = card_inst.card.card_type() == CardType::Attack;
+                    let is_skill = card_inst.card.card_type() == CardType::Skill;
+
+                    if is_attack && entangled {
+                        continue;
+                    }
+
+                    let card_type = card_inst.card.card_type();
+                    let free_play = cs.player.free_play_for.as_ref()
+                        .map_or(false, |types| types.contains(&card_type));
+                    let mut effective_cost = if corruption && is_skill {
+                        0
+                    } else if free_play {
+                        0
+                    } else {
+                        card_inst.cost()
+                    };
+                    if card_inst.card == Card::BloodForBlood && cs.player_damaged_this_combat {
+                        effective_cost = card_inst.base_magic();
+                    }
+                    if card_inst.card == Card::MasterfulStab {
+                        effective_cost = if cs.player_damaged_this_combat {
+                            card_inst.base_magic()
+                        } else {
+                            0
+                        };
+                    }
+                    if cs.cards_cost_zero_this_turn {
+                        effective_cost = 0;
+                    }
+
+                    if effective_cost > total_energy {
+                        continue;
+                    }
+
+                    if card_inst.card.has_target() {
+                        // One action per living monster
+                        for (mi, m) in cs.monsters.iter().enumerate() {
+                            if m.hp > 0 {
+                                actions.push(Action::PlayCard {
+                                    hand_index,
+                                    target: Some(mi),
+                                });
+                            }
+                        }
+                    } else {
+                        actions.push(Action::PlayCard {
+                            hand_index,
+                            target: None,
+                        });
+                    }
+                }
+
+                actions.push(Action::EndTurn {});
+                actions
+            }
+
+            GamePhase::CardReward { options } => {
+                let mut actions: Vec<Action> = options
+                    .iter()
+                    .enumerate()
+                    .map(|(i, _)| Action::PickCard { index: i })
+                    .collect();
+                actions.push(Action::SkipCard {});
+                actions
+            }
+
+            GamePhase::Event(es) => {
+                es.get_choices(self.gold, self.player_hp, self.player_max_hp, Some(self.deck.clone()))
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, c)| c.enabled)
+                    .map(|(i, _)| Action::EventChoose { index: i })
+                    .collect()
+            }
+
+            GamePhase::Shop { shop, phase } => match phase {
+                ShopPhase::Browsing => {
+                    let mut actions: Vec<Action> = shop
+                        .items
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, item)| item.price <= self.gold)
+                        .map(|(i, _)| Action::ShopBuy { index: i })
+                        .collect();
+                    actions.push(Action::ShopLeave {});
+                    actions
+                }
+                ShopPhase::ChoosingCardToRemove => {
+                    (0..self.deck.len())
+                        .map(|i| Action::ShopRemoveCard { card_index: i })
+                        .collect()
+                }
+            },
+
+            GamePhase::RestSite { rest, phase } => match phase {
+                RestPhase::ChoosingAction => {
+                    rest.get_choices(Some(self.relics.clone()), Some(self.deck.clone()))
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, c)| c.enabled)
+                        .map(|(i, _)| Action::RestChoose { index: i })
+                        .collect()
+                }
+                RestPhase::ChoosingCardToUpgrade => {
+                    self.deck
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, c)| !c.upgraded && c.card.can_upgrade())
+                        .map(|(i, _)| Action::RestUpgradeCard { card_index: i })
+                        .collect()
+                }
+            },
+        }
+    }
+
+    /// Execute an action. Returns true if the action was applied successfully.
+    pub fn take_action(&mut self, action: &Action) -> bool {
+        match action {
+            Action::ChooseRoom { index } => {
+                if !matches!(self.phase, GamePhase::MapNavigation) {
+                    return false;
+                }
+                let available = self.get_available_rooms();
+                if *index >= available.len() {
+                    return false;
+                }
+                self.choose_next_room(*index);
+                true
+            }
+            Action::PlayCard { hand_index, target } => {
+                self.play_card(*hand_index, *target, None)
+            }
+            Action::EndTurn {} => {
+                if !matches!(self.phase, GamePhase::Combat(_)) {
+                    return false;
+                }
+                self.end_turn();
+                true
+            }
+            Action::PickCard { index } => {
+                match &self.phase {
+                    GamePhase::CardReward { options } if *index < options.len() => {}
+                    _ => return false,
+                }
+                self.pick_card(*index);
+                true
+            }
+            Action::SkipCard {} => {
+                if !matches!(self.phase, GamePhase::CardReward { .. }) {
+                    return false;
+                }
+                self.skip_card();
+                true
+            }
+            Action::EventChoose { index } => {
+                if !matches!(self.phase, GamePhase::Event(_)) {
+                    return false;
+                }
+                self.event_choose(*index);
+                true
+            }
+            Action::ShopBuy { index } => {
+                if !matches!(self.phase, GamePhase::Shop { phase: ShopPhase::Browsing, .. }) {
+                    return false;
+                }
+                self.shop_buy(*index);
+                true
+            }
+            Action::ShopLeave {} => {
+                if !matches!(self.phase, GamePhase::Shop { .. }) {
+                    return false;
+                }
+                self.shop_leave();
+                true
+            }
+            Action::ShopRemoveCard { card_index } => {
+                if !matches!(self.phase, GamePhase::Shop { phase: ShopPhase::ChoosingCardToRemove, .. }) {
+                    return false;
+                }
+                self.shop_remove_card(*card_index);
+                true
+            }
+            Action::RestChoose { index } => {
+                if !matches!(self.phase, GamePhase::RestSite { phase: RestPhase::ChoosingAction, .. }) {
+                    return false;
+                }
+                self.rest_choose(*index);
+                true
+            }
+            Action::RestUpgradeCard { card_index } => {
+                if !matches!(self.phase, GamePhase::RestSite { phase: RestPhase::ChoosingCardToUpgrade, .. }) {
+                    return false;
+                }
+                self.rest_upgrade_card(*card_index);
+                true
+            }
+        }
+    }
 }
 
 // ---- Internal methods ----
@@ -493,14 +805,15 @@ impl GameState {
         }
     }
 
-    /// Advance to the next room in the linear map.
+    /// Advance to the next room in the map.
+    /// Transitions to MapNavigation so the player chooses where to go.
     fn advance_to_next_room(&mut self) {
         self.current_room += 1;
         if self.current_room >= self.rooms.len() {
             self.phase = GamePhase::GameOver { won: true };
             return;
         }
-        self.enter_current_room();
+        self.phase = GamePhase::MapNavigation;
     }
 
     /// Enter the current room, setting up the appropriate phase.

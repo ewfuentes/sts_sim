@@ -382,7 +382,7 @@ def test_juggernaut_on_block_gain():
         player_powers={"Juggernaut": 1},
     )
     sim.play_card(0, None)
-    assert sim.player.block == 2
+    assert sim.player.block == 1
     assert sim.get_monsters()[0].hp == 9  # 1 Juggernaut damage
 
 

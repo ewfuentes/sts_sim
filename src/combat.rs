@@ -1686,9 +1686,9 @@ impl CombatState {
             }
             Card::Immolate => {
                 self.attack_all_enemies(card_inst);
-                // Add 2 Dazed to discard pile
-                self.add_card_to_discard(Card::Dazed);
-                self.add_card_to_discard(Card::Dazed);
+                // Add 2 Dazed to draw pile
+                self.add_card_to_draw(Card::Dazed);
+                self.add_card_to_draw(Card::Dazed);
             }
             // --- Common Skills ---
             Card::Flex => {
@@ -2676,15 +2676,15 @@ impl CombatState {
         }
     }
 
-    /// Player gains block, modified by Dexterity (multiplicative) and Juggernaut (additive).
+    /// Player gains block, modified by Dexterity. Juggernaut triggers damage on block gain.
     fn player_gain_block(&mut self, amount: i32) {
         let dex = self.player.get_power(PowerType::Dexterity);
-        let jugg = self.player.get_power(PowerType::Juggernaut);
-        let final_amount = (amount + dex + jugg).max(0);
+        let final_amount = (amount + dex).max(0);
         if final_amount > 0 {
             self.player.add_block(final_amount);
 
             // Juggernaut: deal damage to random enemy on block gain
+            let jugg = self.player.get_power(PowerType::Juggernaut);
             if jugg > 0 {
                 // Deal damage to first alive monster (deterministic for simulation)
                 for m in &mut self.monsters {
